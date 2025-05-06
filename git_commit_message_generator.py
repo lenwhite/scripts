@@ -163,7 +163,7 @@ Based on the changes and branch context, generate a concise, one-line commit mes
 3.  **Start with an imperative verb** describing the action (e.g., "Add", "Remove", "Correct", "Implement", "Simplify").
     * Describe the change directly. For example, instead of "Update `User` to support `last_login`", write "Support `last_login` in `User` model".
     * Avoid generic leading words like "Update", "Refactor", or "Enhance" unless they specifically describe the primary action in a way that's more descriptive than the alternative (e.g. "Refactor `complex_function` for clarity").
-4.  **Enclose all code-specific terms** (like function/method names, variable names, class names, file names) in backticks (e.g., \`my\_function\`, \`UserService\`).
+4.  **Enclose all code-specific terms** (like function/method names, variable names, class names, file names) in backticks (e.g., `my_function`, `UserService`).
 5.  **Strive for brevity while ensuring the message clearly communicates the core change.** 
 6.  **Aim for a single, impactful line.** While there's no strict character limit, the message should not become a paragraph.
 7.  If multiple distinct changes are present, **focus the message on the primary or most impactful change.**
