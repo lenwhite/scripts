@@ -16,7 +16,6 @@ from rich.panel import Panel
 from rich.progress import Progress
 from openai import OpenAI
 
-# Initialize console for rich output
 console = Console()
 
 
@@ -37,7 +36,6 @@ def is_git_repository():
 def get_git_diff():
     """Get the git diff of staged changes."""
     try:
-        # Get the diff of staged changes
         result = subprocess.run(
             ["git", "diff", "--cached"],
             check=True,
@@ -90,7 +88,6 @@ def get_current_branch():
 def get_branch_commits():
     """Get the git log entries for the current branch up to where it branches from master."""
     try:
-        # Find the common ancestor with master
         merge_base_result = subprocess.run(
             ["git", "merge-base", "master", "HEAD"],
             check=True,
@@ -100,7 +97,6 @@ def get_branch_commits():
         )
         merge_base = merge_base_result.stdout.strip()
 
-        # Get the log from HEAD to the merge base
         log_result = subprocess.run(
             ["git", "log", f"{merge_base}..HEAD", "--oneline"],
             check=True,
@@ -111,7 +107,6 @@ def get_branch_commits():
 
         return log_result.stdout.strip()
     except subprocess.CalledProcessError as e:
-        # This might fail if master doesn't exist or other issues
         console.print(
             f"[bold yellow]Warning: Could not get branch commits:[/bold yellow] {e.stderr}"
         )
@@ -135,7 +130,6 @@ def stage_all_changes():
 
 def generate_commit_message(diff_text, branch_name, branch_commits):
     """Generate a commit message using OpenAI's API."""
-    # Check for API key
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
         console.print(
@@ -143,20 +137,16 @@ def generate_commit_message(diff_text, branch_name, branch_commits):
         )
         sys.exit(1)
 
-    # Initialize OpenAI client
     client = OpenAI(api_key=api_key)
 
-    # Truncate diff if it's too large (to avoid token limits)
-    max_diff_length = 50000  # Adjust based on model token limits
+    max_diff_length = 50000
     if len(diff_text) > max_diff_length:
         diff_text = diff_text[:max_diff_length] + "\n[Diff truncated due to size...]"
 
-    # Add branch context
     branch_context = f"Current branch: {branch_name}\n"
     if branch_commits:
         branch_context += f"Commit history on this branch:\n{branch_commits}\n"
 
-    # Hard-coded prompt for generating commit message
     prompt = f"""
 <context>
 {branch_context}
@@ -200,7 +190,6 @@ Only write the commit message, nothing else.
 
             progress.update(task, completed=1)
 
-            # Extract the commit message from the response
             commit_message = response.choices[0].message.content.strip()
             return commit_message
 
@@ -242,15 +231,12 @@ def parse_arguments():
 
 
 def main():
-    # Parse command line arguments
     args = parse_arguments()
 
-    # Check if we're in a git repository
     if not is_git_repository():
         console.print("[bold red]Error:[/bold red] Not in a git repository.")
         sys.exit(1)
 
-    # Check if there are staged changes
     staged_files = get_staged_files()
     if not staged_files:
         console.print("[bold yellow]No staged changes to commit.[/bold yellow]")
@@ -261,16 +247,13 @@ def main():
 
     console.print(f"[bold green]Found {len(staged_files)} staged files.[/bold green]")
 
-    # Get the git diff of staged changes
     console.print("[bold cyan]Getting git diff of staged changes...[/bold cyan]")
     diff = get_git_diff()
 
-    # Check if there is a diff (this should always be true if there are staged files, but just in case)
     if not diff.strip():
         console.print("[bold yellow]No changes detected in staged files.[/bold yellow]")
         sys.exit(0)
 
-    # Get branch information
     console.print("[bold cyan]Getting branch information...[/bold cyan]")
     branch_name = get_current_branch()
     console.print(f"[bold green]Current branch: {branch_name}[/bold green]")
@@ -279,7 +262,6 @@ def main():
     if branch_commits:
         console.print("[bold green]Found commit history for this branch[/bold green]")
 
-    # Generate commit message
     commit_message = generate_commit_message(diff, branch_name, branch_commits)
 
     if not commit_message:
@@ -288,17 +270,14 @@ def main():
         )
         commit_message = "Update code based on recent changes"
 
-    # Display the generated commit message
     console.print(
         Panel(commit_message, title="Generated Commit Message", border_style="green")
     )
 
-    # Check if this is a dry run
     if args.dry_run:
         console.print("[bold yellow]Dry run mode: Changes not committed.[/bold yellow]")
         return
 
-    # Commit the changes
     console.print("[bold cyan]Committing changes...[/bold cyan]")
     if commit_changes(commit_message):
         console.print("[bold green]Successfully committed changes![/bold green]")
