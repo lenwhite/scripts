@@ -128,7 +128,7 @@ def stage_all_changes():
         return False
 
 
-def generate_commit_message(diff_text, branch_name, branch_commits):
+def generate_commit_message(diff_text, branch_name, branch_commits, user_comments="None"):
     """Generate a commit message using OpenAI's API."""
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
@@ -168,6 +168,10 @@ Based on these changes and the branch context, generate a concise, one-line comm
 - Do not start the message with "Update" or "Refactor"
 
 Only write the commit message, nothing else.
+
+<user_comments>
+{user_comments}
+</user_comments>
 """
 
     with Progress() as progress:
@@ -223,6 +227,12 @@ def parse_arguments():
         description="Generate commit messages using OpenAI's GPT-4o model."
     )
     parser.add_argument(
+        "comments",
+        nargs="?",
+        default="",
+        help="User comments to include in the commit message generation prompt",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Generate commit message without actually committing",
@@ -262,7 +272,7 @@ def main():
     if branch_commits:
         console.print("[bold green]Found commit history for this branch[/bold green]")
 
-    commit_message = generate_commit_message(diff, branch_name, branch_commits)
+    commit_message = generate_commit_message(diff, branch_name, branch_commits, args.comments)
 
     if not commit_message:
         console.print(
