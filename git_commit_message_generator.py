@@ -156,15 +156,19 @@ def generate_commit_message(diff_text, branch_name, branch_commits, user_comment
 {diff_text}
 </diff>
 
-Based on these changes and the branch context, generate a concise, one-line commit message following these guidelines:
-- Infer intent from the diff and branch context, if obvious
-- Otherwise, identify exactly what was changed by symbol or function name
-- Surround code-related terms in backticks (e.g. "Move `function_name`")
-- Be concise, but not to the point of losing specificity
-- Don't be bound by a character limit, but avoid writing a paragraph
-- Do not include issue numbers or references
-- If there are multiple changes, list the most important one first
-- Do not start the message with words like "Update"/"Refactor"/"Enhance". Describe the change directly. E.g. instead of "Update X to do Y", write "Y by X".
+Based on the changes and branch context, generate a concise, one-line commit message following these guidelines:
+
+1.  **Prioritize inferring the overall intent** of the changes from the diff and branch context. If the intent is clear, use it to describe the "why" or "what" at a higher level.
+2.  If intent isn't obvious, **describe the most significant concrete change**, referencing specific symbols, function names, or key entities modified.
+3.  **Start with an imperative verb** describing the action (e.g., "Add", "Remove", "Correct", "Implement", "Simplify").
+    * Describe the change directly. For example, instead of "Update `User` to support `last_login`", write "Support `last_login` in `User` model".
+    * Avoid generic leading words like "Update", "Refactor", or "Enhance" unless they specifically describe the primary action in a way that's more descriptive than the alternative (e.g. "Refactor `complex_function` for clarity").
+4.  **Enclose all code-specific terms** (like function/method names, variable names, class names, file names) in backticks (e.g., \`my\_function\`, \`UserService\`).
+5.  **Strive for brevity while ensuring the message clearly communicates the core change.** 
+6.  **Aim for a single, impactful line.** While there's no strict character limit, the message should not become a paragraph.
+7.  If multiple distinct changes are present, **focus the message on the primary or most impactful change.**
+8.  **Exclude issue tracker numbers, ticket references, or URLs** from the commit message itself.
+
 
 Only write the commit message, nothing else.
 
