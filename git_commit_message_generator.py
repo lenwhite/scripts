@@ -163,9 +163,8 @@ Based on these changes and the branch context, generate a concise, one-line comm
 - Be concise, but not to the point of losing specificity
 - Don't be bound by a character limit, but avoid writing a paragraph
 - Do not include issue numbers or references
-- Consider the branch name and previous commits for context
 - If there are multiple changes, list the most important one first
-- Do not start the message with "Update" or "Refactor"
+- Do not start the message with words like "Update"/"Refactor"/"Enhance". Describe the change directly. E.g. instead of "Update X to do Y", write "Y by X".
 
 Only write the commit message, nothing else.
 
