@@ -170,7 +170,7 @@ Based on the changes and branch context, generate a concise, one-line commit mes
 8.  **Exclude issue tracker numbers, ticket references, or URLs** from the commit message itself.
 
 
-Only write the commit message, nothing else.
+Only write the commit message, nothing else. If you are unsure about the commit message, write "NOT ENOUGH CONTEXT".
 
 <user_comments>
 {user_comments}
@@ -276,6 +276,12 @@ def main():
         console.print("[bold green]Found commit history for this branch[/bold green]")
 
     commit_message = generate_commit_message(diff, branch_name, branch_commits, args.comments)
+
+    if commit_message == "NOT ENOUGH CONTEXT":
+        console.print(
+            "[bold red]Failed to generate commit message. Rerun the script with more context.[/bold red]"
+        )
+        sys.exit(1)
 
     if not commit_message:
         console.print(
