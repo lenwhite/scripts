@@ -86,25 +86,15 @@ def get_current_branch():
 
 
 def get_branch_commits():
-    """Get the git log entries for the current branch up to where it branches from master."""
     try:
-        merge_base_result = subprocess.run(
-            ["git", "merge-base", "master", "HEAD"],
-            check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
-        merge_base = merge_base_result.stdout.strip()
-
         log_result = subprocess.run(
-            ["git", "log", f"{merge_base}..HEAD", "--oneline"],
+            ["git", "log", "-20", "--oneline"],
             check=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
         )
-
+        
         return log_result.stdout.strip()
     except subprocess.CalledProcessError as e:
         console.print(
@@ -114,7 +104,7 @@ def get_branch_commits():
 
 
 def stage_all_changes():
-    """Stage all changes."""
+
     try:
         subprocess.run(
             ["git", "add", "-A"],
@@ -128,7 +118,7 @@ def stage_all_changes():
         return False
 
 
-def generate_commit_message(diff_text, branch_name, branch_commits, user_comments="None"):
+def get_commit_history(diff_text, branch_name, branch_commits, user_provided_context="None"):
     """Generate a commit message using OpenAI's API."""
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
@@ -158,7 +148,7 @@ def generate_commit_message(diff_text, branch_name, branch_commits, user_comment
 
 Based on the changes and branch context, generate a concise, one-line commit message following these guidelines:
 
-1.  **Prioritize inferring the overall intent** of the changes from the diff and branch context. If the intent is clear, use it to describe the "why" or "what" at a higher level.
+1.  **Prioritize inferring the overall intent** of the changes from the diff, commit history, and user provided context. If the intent is clear, use it to describe the "why" or "what" at a higher level.
 2.  If intent isn't obvious, **describe the most significant concrete change**, referencing specific symbols, function names, or key entities modified.
 3.  **Start with an imperative verb** describing the action (e.g., "Add", "Remove", "Correct", "Implement", "Simplify").
     * Describe the change directly. For example, instead of "Update `User` to support `last_login`", write "Support `last_login` in `User` model".
@@ -172,9 +162,9 @@ Based on the changes and branch context, generate a concise, one-line commit mes
 
 Only write the commit message, nothing else. If you are unsure about the commit message, write "NOT ENOUGH CONTEXT".
 
-<user_comments>
-{user_comments}
-</user_comments>
+<user_provided_context>
+{user_provided_context}
+</user_provided_context>
 """
 
     with Progress() as progress:
@@ -275,7 +265,7 @@ def main():
     if branch_commits:
         console.print("[bold green]Found commit history for this branch[/bold green]")
 
-    commit_message = generate_commit_message(diff, branch_name, branch_commits, args.comments)
+    commit_message = get_commit_history(diff, branch_name, branch_commits, args.comments)
 
     if commit_message == "NOT ENOUGH CONTEXT":
         console.print(
