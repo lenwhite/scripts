@@ -19,98 +19,100 @@ from openai import OpenAI
 console = Console()
 
 
-def is_git_repository():
+def try_subprocess_run(args, *, error_msg, exit_on_error=True):
+    """
+    Run a subprocess command with consistent error handling and encoding.
+
+    Args:
+        args: Command arguments to pass to subprocess.run
+        error_msg: Error message to display on failure
+        exit_on_error: Whether to exit the program on error (default: True)
+
+    Returns:
+        Command stdout on success, None on failure (if exit_on_error=False)
+    """
     try:
-        subprocess.run(
-            ["git", "rev-parse", "--is-inside-work-tree"],
+        result = subprocess.run(
+            args,
             check=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
         )
-        return True
-    except subprocess.CalledProcessError:
-        return False
+        return result.stdout
+    except subprocess.CalledProcessError as e:
+        console.print(f"[bold red]{error_msg}:[/bold red] {e.stderr}")
+        if exit_on_error:
+            sys.exit(1)
+        return None
+    except (UnicodeDecodeError, UnicodeError) as e:
+        console.print(f"[bold red]Unicode error {error_msg.lower()}:[/bold red] {e}")
+        if exit_on_error:
+            sys.exit(1)
+        return None
+
+
+def is_git_repository():
+    result = try_subprocess_run(
+        ["git", "rev-parse", "--is-inside-work-tree"],
+        error_msg="Error checking git repository",
+        exit_on_error=False,
+    )
+    return result is not None
 
 
 def get_git_diff():
-    try:
-        result = subprocess.run(
-            ["git", "diff", "--cached"],
-            check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
-
-        return result.stdout
-    except subprocess.CalledProcessError as e:
-        console.print(f"[bold red]Error getting git diff:[/bold red] {e.stderr}")
-        sys.exit(1)
+    return try_subprocess_run(
+        ["git", "diff", "--cached"],
+        error_msg="Error getting git diff",
+    )
 
 
 def get_staged_files():
-    try:
-        result = subprocess.run(
-            ["git", "diff", "--name-only", "--cached"],
-            check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
+    result = try_subprocess_run(
+        ["git", "diff", "--name-only", "--cached"],
+        error_msg="Error getting staged files",
+    )
 
-        files = result.stdout.strip().split("\n")
-        return [f for f in files if f]  # Filter out empty strings
-    except subprocess.CalledProcessError as e:
-        console.print(f"[bold red]Error getting staged files:[/bold red] {e.stderr}")
-        sys.exit(1)
+    files = result.strip().split("\n")
+    return [f for f in files if f]  # Filter out empty strings
 
 
 def get_current_branch():
-    try:
-        result = subprocess.run(
-            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-            check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
+    result = try_subprocess_run(
+        ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+        error_msg="Error getting current branch",
+        exit_on_error=False,
+    )
 
-        return result.stdout.strip()
-    except subprocess.CalledProcessError as e:
-        console.print(f"[bold red]Error getting current branch:[/bold red] {e.stderr}")
+    if result is not None:
+        return result.strip()
+    else:
         return "unknown-branch"
 
 
 def get_branch_commits():
-    try:
-        log_result = subprocess.run(
-            ["git", "log", "-20", "--oneline"],
-            check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
+    result = try_subprocess_run(
+        ["git", "log", "--oneline", "--no-merges"],
+        error_msg="Error getting branch commit history",
+        exit_on_error=False,
+    )
 
-        return log_result.stdout.strip()
-    except subprocess.CalledProcessError as e:
+    if result is None:
         console.print(
-            f"[bold yellow]Warning: Could not get branch commits:[/bold yellow] {e.stderr}"
+            f"[bold yellow]Warning: Could not get branch commits:[/bold yellow]"
         )
-        return ""
+        return None
+    return result.strip() if result.strip() else None
 
 
 def stage_all_changes():
-    try:
-        subprocess.run(
-            ["git", "add", "-A"],
-            check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-        return True
-    except subprocess.CalledProcessError as e:
-        console.print(f"[bold red]Error staging changes:[/bold red] {e.stderr}")
-        return False
+    result = try_subprocess_run(
+        ["git", "add", "-A"], error_msg="Error staging changes", exit_on_error=False
+    )
+    return result is not None
 
 
 def get_commit_history(
@@ -193,18 +195,12 @@ Only write the commit message, nothing else. If you are unsure about the commit 
 
 
 def commit_changes(message):
-    try:
-        subprocess.run(
-            ["git", "commit", "-m", message],
-            check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
-        return True
-    except subprocess.CalledProcessError as e:
-        console.print(f"[bold red]Error committing changes:[/bold red] {e.stderr}")
-        return False
+    result = try_subprocess_run(
+        ["git", "commit", "-m", message],
+        error_msg="Error committing changes",
+        exit_on_error=False,
+    )
+    return result is not None
 
 
 def parse_arguments():
@@ -245,7 +241,7 @@ def main():
     console.print("[bold cyan]Getting git diff of staged changes...[/bold cyan]")
     diff = get_git_diff()
 
-    if not diff.strip():
+    if not diff or not diff.strip():
         console.print("[bold yellow]No changes detected in staged files.[/bold yellow]")
         sys.exit(0)
 
