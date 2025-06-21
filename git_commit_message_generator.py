@@ -90,7 +90,7 @@ def get_branch_commits():
             stderr=subprocess.PIPE,
             text=True,
         )
-        
+
         return log_result.stdout.strip()
     except subprocess.CalledProcessError as e:
         console.print(
@@ -100,7 +100,6 @@ def get_branch_commits():
 
 
 def stage_all_changes():
-
     try:
         subprocess.run(
             ["git", "add", "-A"],
@@ -114,7 +113,9 @@ def stage_all_changes():
         return False
 
 
-def get_commit_history(diff_text, branch_name, branch_commits, user_provided_context="None"):
+def get_commit_history(
+    diff_text, branch_name, branch_commits, user_provided_context="None"
+):
     """Generate a commit message using OpenAI's API."""
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
@@ -173,7 +174,7 @@ Only write the commit message, nothing else. If you are unsure about the commit 
                     {
                         "role": "system",
                         "content": "You are an experienced developer. "
-                        "Having just written some code, you are now committing that code to git."
+                        "Having just written some code, you are now committing that code to git.",
                     },
                     {"role": "user", "content": prompt},
                 ],
@@ -259,7 +260,9 @@ def main():
     if branch_commits:
         console.print("[bold green]Found commit history for this branch[/bold green]")
 
-    commit_message = get_commit_history(diff, branch_name, branch_commits, args.comments)
+    commit_message = get_commit_history(
+        diff, branch_name, branch_commits, args.comments
+    )
 
     if commit_message == "NOT ENOUGH CONTEXT":
         console.print(
