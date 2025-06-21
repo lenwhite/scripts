@@ -20,17 +20,6 @@ console = Console()
 
 
 def try_subprocess_run(args, *, error_msg, exit_on_error=True):
-    """
-    Run a subprocess command with consistent error handling and encoding.
-
-    Args:
-        args: Command arguments to pass to subprocess.run
-        error_msg: Error message to display on failure
-        exit_on_error: Whether to exit the program on error (default: True)
-
-    Returns:
-        Command stdout on success, None on failure (if exit_on_error=False)
-    """
     try:
         result = subprocess.run(
             args,
@@ -80,17 +69,12 @@ def get_staged_files():
     return [f for f in files if f]  # Filter out empty strings
 
 
-def get_current_branch():
-    result = try_subprocess_run(
+def get_branch_name():
+    return try_subprocess_run(
         ["git", "rev-parse", "--abbrev-ref", "HEAD"],
         error_msg="Error getting current branch",
-        exit_on_error=False,
+        exit_on_error=True,
     )
-
-    if result is not None:
-        return result.strip()
-    else:
-        return "unknown-branch"
 
 
 def get_branch_commits():
@@ -115,54 +99,68 @@ def stage_all_changes():
     return result is not None
 
 
-def get_commit_history(
-    diff_text, branch_name, branch_commits, user_provided_context="None"
-):
+def assemble_prompt(user_provided_context):
     """Generate a commit message using OpenAI's API."""
+
+    staged_files = get_staged_files()
+    if not staged_files:
+        console.print("[bold yellow]No staged changes to commit.[/bold yellow]")
+        sys.exit(0)
+    diff = get_git_diff()
+
+    branch_name = get_branch_name()
+    commits = get_branch_commits()
+
+    max_diff_length = 50000
+    if len(diff) > max_diff_length:
+        diff = diff[:max_diff_length] + "\n[Diff truncated due to size...]"
+
+    context = f"<branch_name>{branch_name}</branch_name>\n"
+    if commits:
+        context += f"<commit_history>\n{commits}\n</commit_history>"
+    if user_provided_context:
+        context += f"<task_context>\n{user_provided_context}\n</task_context>"
+
+    TASK_CONTEXT_SPECIFIC_INSTRUCTIONS = (
+        "✅ Ensure the commit message reflects the task context, describing the 'why' or 'what' at a higher level.\n"
+        "✅ Where appropriate, enrich the commit message with details of the code change in concrete terms, referencing specific symbols, function names, or key entities modified.\n"
+    )
+    NO_TASK_CONTEXT_INSTRUCTIONS = (
+        "✅ Focus on the diff and commit history to infer the intent behind the changes.\n"
+        "✅ If intent isn't obvious, describe the code change in concrete terms, referencing specific symbols, function names, or key entities modified."
+    )
+
+    prompt = f"""
+<diff>
+{diff}
+</diff>
+
+Based on the diff context, generate a concise, one-line commit message following these guidelines:
+
+✅ Use conventional commit message style. Types include: feat, fix, docs, style, refactor, test, chore. Use an appropriate scope (e.g. `commit-gen` for this script).
+{TASK_CONTEXT_SPECIFIC_INSTRUCTIONS if user_provided_context else NO_TASK_CONTEXT_INSTRUCTIONS}
+✅ Describe the change concisely. For example, instead of "feat: Update `User` to support `last_login` tracking", write "feat(user-model): Track `last_login`.
+✅ Enclose all code-specific terms (like function/method names, variable names, class names, file names) in backticks (e.g., `my_function`, `UserService`).
+✅ If multiple distinct changes are present, focus on the primary or most impactful change.
+❌ Exclude issue tracker numbers, ticket references, or URLs
+
+Only write the commit message, nothing else. If you are unsure about the commit message, write "NOT ENOUGH CONTEXT".
+
+<context>
+{context}
+</context>
+"""
+    return prompt
+
+
+def agent_generate_commit_message(prompt, max_completion_tokens=250, temperature=0.1):
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
         console.print(
             "[bold red]Error:[/bold red] OPENAI_API_KEY environment variable not set."
         )
         sys.exit(1)
-
     client = OpenAI(api_key=api_key)
-
-    max_diff_length = 50000
-    if len(diff_text) > max_diff_length:
-        diff_text = diff_text[:max_diff_length] + "\n[Diff truncated due to size...]"
-
-    branch_context = f"Current branch: {branch_name}\n"
-    if branch_commits:
-        branch_context += f"Commit history on this branch:\n{branch_commits}\n"
-
-    prompt = f"""
-<context>
-{branch_context}
-</context>
-
-<diff>
-{diff_text}
-</diff>
-
-Based on the changes and branch context, generate a concise, one-line commit message following these guidelines:
-
-✅ Use conventional commit message style. Types include: feat, fix, docs, style, refactor, test, chore. Use a scope based on the file or functionality changed.
-✅ Infer the intent of the changes from the user provided context, diff, commit history. Use it to describe the "why" or "what" at a higher level.
-✅ If intent isn't obvious, describe the code change in concrete terms, referencing specific symbols, function names, or key entities modified.
-✅ Describe the change concisely. For example, instead of "feat: Update `User` to support `last_login` tracking", write "feat(user-model): Track `last_login`.
-✅ Enclose all code-specific terms (like function/method names, variable names, class names, file names) in backticks (e.g., `my_function`, `UserService`).
-✅ Strive for brevity while ensuring the message clearly communicates the core change.** 
-✅ If multiple distinct changes are present, focus on the primary or most impactful change.
-❌ Exclude issue tracker numbers, ticket references, or URLs
-
-Only write the commit message, nothing else. If you are unsure about the commit message, write "NOT ENOUGH CONTEXT".
-
-<user_provided_context>
-{user_provided_context}
-</user_provided_context>
-"""
-
     with Progress() as progress:
         task = progress.add_task("[cyan]Generating commit message...", total=1)
 
@@ -177,8 +175,8 @@ Only write the commit message, nothing else. If you are unsure about the commit 
                     },
                     {"role": "user", "content": prompt},
                 ],
-                max_completion_tokens=150,
-                temperature=0.1,
+                max_completion_tokens=max_completion_tokens,
+                temperature=temperature,
             )
 
             progress.update(task, completed=1)
@@ -228,34 +226,8 @@ def main():
         console.print("[bold red]Error:[/bold red] Not in a git repository.")
         sys.exit(1)
 
-    staged_files = get_staged_files()
-    if not staged_files:
-        console.print("[bold yellow]No staged changes to commit.[/bold yellow]")
-        console.print(
-            "[bold cyan]Tip:[/bold cyan] Use 'git add <file>' to stage changes before running this script."
-        )
-        sys.exit(0)
-
-    console.print(f"[bold green]Found {len(staged_files)} staged files.[/bold green]")
-
-    console.print("[bold cyan]Getting git diff of staged changes...[/bold cyan]")
-    diff = get_git_diff()
-
-    if not diff or not diff.strip():
-        console.print("[bold yellow]No changes detected in staged files.[/bold yellow]")
-        sys.exit(0)
-
-    console.print("[bold cyan]Getting branch information...[/bold cyan]")
-    branch_name = get_current_branch()
-    console.print(f"[bold green]Current branch: {branch_name}[/bold green]")
-
-    branch_commits = get_branch_commits()
-    if branch_commits:
-        console.print("[bold green]Found commit history for this branch[/bold green]")
-
-    commit_message = get_commit_history(
-        diff, branch_name, branch_commits, args.comments
-    )
+    prompt = assemble_prompt(args.comments)
+    commit_message = agent_generate_commit_message(prompt)
 
     if commit_message == "NOT ENOUGH CONTEXT":
         console.print(
