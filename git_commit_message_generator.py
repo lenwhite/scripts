@@ -149,7 +149,7 @@ Based on the diff context, generate a concise, one-line commit message following
 ✅ If multiple distinct changes are present, focus on the primary or most impactful change.
 ❌ Exclude issue tracker numbers, ticket references, or URLs
 
-Only write the commit message, nothing else. If you are unsure about the commit message, write "NOT ENOUGH CONTEXT".
+Only write the commit message, or NOT ENOUGH CONTEXT if the meaning of the changes is not clear.
 
 <context>
 {context}
