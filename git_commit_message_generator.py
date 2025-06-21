@@ -20,7 +20,6 @@ console = Console()
 
 
 def is_git_repository():
-    """Check if the current directory is a git repository."""
     try:
         subprocess.run(
             ["git", "rev-parse", "--is-inside-work-tree"],
@@ -34,7 +33,6 @@ def is_git_repository():
 
 
 def get_git_diff():
-    """Get the git diff of staged changes."""
     try:
         result = subprocess.run(
             ["git", "diff", "--cached"],
@@ -51,7 +49,6 @@ def get_git_diff():
 
 
 def get_staged_files():
-    """Get a list of staged files."""
     try:
         result = subprocess.run(
             ["git", "diff", "--name-only", "--cached"],
@@ -69,7 +66,6 @@ def get_staged_files():
 
 
 def get_current_branch():
-    """Get the name of the current branch."""
     try:
         result = subprocess.run(
             ["git", "rev-parse", "--abbrev-ref", "HEAD"],
@@ -199,7 +195,6 @@ Only write the commit message, nothing else. If you are unsure about the commit 
 
 
 def commit_changes(message):
-    """Commit changes with the given message."""
     try:
         subprocess.run(
             ["git", "commit", "-m", message],
@@ -215,7 +210,6 @@ def commit_changes(message):
 
 
 def parse_arguments():
-    """Parse command line arguments."""
     parser = argparse.ArgumentParser(
         description="Generate commit messages using OpenAI's GPT-4o model."
     )
