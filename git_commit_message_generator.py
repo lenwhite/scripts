@@ -77,9 +77,9 @@ def get_branch_name():
     )
 
 
-def get_branch_commits():
+def get_commit_history():
     result = try_subprocess_run(
-        ["git", "log", "--oneline", "--no-merges"],
+        ["git", "log", "--oneline", "--no-merges", "--max-count=25"],
         error_msg="Error getting branch commit history",
         exit_on_error=False,
     )
@@ -98,6 +98,11 @@ def stage_all_changes():
     )
     return result is not None
 
+def truncate_context(context, max_length=25000):
+    if len(context) > max_length:
+        context = context[:max_length] + "\n[Content truncated due to size...]"
+    return context
+
 
 def assemble_prompt(user_provided_context):
     """Generate a commit message using OpenAI's API."""
@@ -107,17 +112,14 @@ def assemble_prompt(user_provided_context):
         console.print("[bold yellow]No staged changes to commit.[/bold yellow]")
         sys.exit(0)
     diff = get_git_diff()
+    diff = truncate_context(diff)
 
     branch_name = get_branch_name()
-    commits = get_branch_commits()
-
-    max_diff_length = 50000
-    if len(diff) > max_diff_length:
-        diff = diff[:max_diff_length] + "\n[Diff truncated due to size...]"
+    commits = get_commit_history()
 
     context = f"<branch_name>{branch_name}</branch_name>\n"
     if commits:
-        context += f"<commit_history>\n{commits}\n</commit_history>"
+        context += f"<commit_history>\n{truncate_context(commits)}\n</commit_history>"
     if user_provided_context:
         context += f"<task_context>\n{user_provided_context}\n</task_context>"
 
