@@ -139,7 +139,10 @@ def assemble_prompt(user_provided_context):
 
 Based on the diff context, generate a concise, one-line commit message following these guidelines:
 
-✅ Use conventional commit message style. Types include: feat, fix, docs, style, refactor, test, chore. Use an appropriate scope (e.g. `commit-gen` for this script).
+✅ Use conventional commit message style. 
+- Types include: feat, fix, docs, style, refactor, test, chore. 
+- Use a granular but short, abbreviated scope based on the app/feature/component/script/etc. that is being changed. 
+- For example, if the change is to the `User` model, the scope could be `user-model`.
 {TASK_CONTEXT_SPECIFIC_INSTRUCTIONS if user_provided_context else NO_TASK_CONTEXT_INSTRUCTIONS}
 ✅ Describe the change concisely. For example, instead of "feat: Update `User` to support `last_login` tracking", write "feat(user-model): Track `last_login`.
 ✅ Enclose all code-specific terms (like function/method names, variable names, class names, file names) in backticks (e.g., `my_function`, `UserService`).
@@ -168,7 +171,7 @@ def agent_generate_commit_message(prompt, max_completion_tokens=250, temperature
 
         try:
             response = client.chat.completions.create(
-                model="gpt-4o",
+                model="gpt-4.1",
                 messages=[
                     {
                         "role": "system",
