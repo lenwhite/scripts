@@ -158,7 +158,7 @@ Only write the commit message, nothing else. If you are unsure about the commit 
     return prompt
 
 
-def agent_generate_commit_message(prompt, max_completion_tokens=250, temperature=0.1):
+def agent_generate_commit_message(prompt, max_completion_tokens=250, temperature=0.0):
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
         console.print(
