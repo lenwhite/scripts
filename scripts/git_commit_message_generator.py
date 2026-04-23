@@ -86,7 +86,7 @@ def get_commit_history():
 
     if result is None:
         console.print(
-            f"[bold yellow]Warning: Could not get branch commits:[/bold yellow]"
+            "[bold yellow]Warning: Could not get branch commits:[/bold yellow]"
         )
         return None
     return result.strip() if result.strip() else None
@@ -159,7 +159,12 @@ Only write the commit message, or NOT ENOUGH CONTEXT if the meaning of the chang
     return prompt
 
 
-def agent_generate_commit_message(prompt, max_completion_tokens=250, temperature=0.0):
+def agent_generate_commit_message(
+    prompt,
+    model="external-gpt-core-beta-mini",
+    max_completion_tokens=250,
+    temperature=0.0,
+):
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
         console.print(
@@ -173,7 +178,7 @@ def agent_generate_commit_message(prompt, max_completion_tokens=250, temperature
 
         try:
             response = client.chat.completions.create(
-                model="gpt-4.1",
+                model=model,
                 messages=[
                     {
                         "role": "system",
@@ -219,6 +224,11 @@ def parse_arguments():
         help="User comments to include in the commit message generation prompt",
     )
     parser.add_argument(
+        "--model",
+        default="gpt-4.1",
+        help="Model to use for generation (default: gpt-4.1)",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Generate commit message without actually committing",
@@ -234,7 +244,7 @@ def main():
         sys.exit(1)
 
     prompt = assemble_prompt(args.comments)
-    commit_message = agent_generate_commit_message(prompt)
+    commit_message = agent_generate_commit_message(prompt, model=args.model)
 
     if commit_message == "NOT ENOUGH CONTEXT":
         console.print(
