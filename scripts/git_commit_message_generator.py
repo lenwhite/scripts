@@ -98,6 +98,7 @@ def stage_all_changes():
     )
     return result is not None
 
+
 def truncate_context(context, max_length=25000):
     if len(context) > max_length:
         context = context[:max_length] + "\n[Content truncated due to size...]"
@@ -140,7 +141,7 @@ def assemble_prompt(user_provided_context):
 Based on the diff context, generate a concise, one-line commit message following these guidelines:
 
 ✅ Use conventional commit message style. 
-- Types include: feat, fix, docs, style, refactor, test, chore. 
+- Types include: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `papercut`, `ci`
 - Use a granular but short, abbreviated scope based on the app/feature/component/script/etc. that is being changed. 
 - For example, if the change is to the `User` model, the scope could be `user-model`.
 {TASK_CONTEXT_SPECIFIC_INSTRUCTIONS if user_provided_context else NO_TASK_CONTEXT_INSTRUCTIONS}
@@ -165,7 +166,8 @@ def agent_generate_commit_message(prompt, max_completion_tokens=250, temperature
             "[bold red]Error:[/bold red] OPENAI_API_KEY environment variable not set."
         )
         sys.exit(1)
-    client = OpenAI(api_key=api_key)
+    base_url = os.environ.get("OPENAI_BASE_URL")
+    client = OpenAI(api_key=api_key, base_url=base_url)
     with Progress() as progress:
         task = progress.add_task("[cyan]Generating commit message...", total=1)
 
@@ -208,7 +210,7 @@ def commit_changes(message):
 
 def parse_arguments():
     parser = argparse.ArgumentParser(
-        description="Generate commit messages using OpenAI's GPT-4o model."
+        description="Generate commit messages using OpenAI models."
     )
     parser.add_argument(
         "comments",
