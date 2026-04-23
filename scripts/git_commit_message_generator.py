@@ -13,7 +13,6 @@ import sys
 import argparse
 from rich.console import Console
 from rich.panel import Panel
-from rich.progress import Progress
 from openai import OpenAI
 
 console = Console()
@@ -173,35 +172,26 @@ def agent_generate_commit_message(
         sys.exit(1)
     base_url = os.environ.get("OPENAI_BASE_URL")
     client = OpenAI(api_key=api_key, base_url=base_url)
-    with Progress() as progress:
-        task = progress.add_task("[cyan]Generating commit message...", total=1)
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are an experienced developer. "
+                    "Having just written some code, you are now committing that code to git.",
+                },
+                {"role": "user", "content": prompt},
+            ],
+            max_completion_tokens=max_completion_tokens,
+            temperature=temperature,
+        )
 
-        try:
-            response = client.chat.completions.create(
-                model=model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are an experienced developer. "
-                        "Having just written some code, you are now committing that code to git.",
-                    },
-                    {"role": "user", "content": prompt},
-                ],
-                max_completion_tokens=max_completion_tokens,
-                temperature=temperature,
-            )
+        return response.choices[0].message.content.strip()
 
-            progress.update(task, completed=1)
-
-            commit_message = response.choices[0].message.content.strip()
-            return commit_message
-
-        except Exception as e:
-            progress.update(task, completed=1)
-            console.print(
-                f"[bold red]Error generating commit message:[/bold red] {str(e)}"
-            )
-            return None
+    except Exception as e:
+        console.print(f"[bold red]Error generating commit message:[/bold red] {str(e)}")
+        return None
 
 
 def commit_changes(message):
