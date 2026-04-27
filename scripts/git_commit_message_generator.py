@@ -180,7 +180,8 @@ def agent_generate_commit_message(
             temperature=temperature,
         )
 
-        return response.choices[0].message.content.strip()
+        content = response.choices[0].message.content
+        return content.strip() if content else None
 
     except Exception as e:
         console.print(f"[bold red]Error generating commit message:[/bold red] {str(e)}")
