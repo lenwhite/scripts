@@ -15,12 +15,26 @@ import subprocess
 import sys
 from collections import defaultdict
 from pathlib import Path
+from typing import NotRequired, TypedDict
 
 import click
 
+
+class CommandConfig(TypedDict):
+    cmd: list[str]
+    append_files: bool
+    prereq: NotRequired[list[str]]
+    prereq_invert: NotRequired[bool]
+
+
+class FileTypeConfig(TypedDict):
+    extensions: list[str]
+    commands: list[CommandConfig]
+
+
 # File type definitions with commands ordered cheapest → most expensive
 # Commands can have "prereq": if the prereq command fails, the command is skipped
-FILE_TYPES = {
+FILE_TYPES: dict[str, FileTypeConfig] = {
     "python": {
         "extensions": [".py"],
         "commands": [
@@ -157,7 +171,7 @@ def main(files: tuple[Path, ...]) -> None:
             cmd = cmd_config["cmd"]
             append_files = cmd_config["append_files"]
             prereq = cmd_config.get("prereq")
-            prereq_invert = cmd_config.get("prereq_invert", False)
+            prereq_invert = cmd_config.get("prereq_invert", False) or False
             cmd_name = " ".join(cmd[:2])  # e.g., "uvx ruff" or "npx prettier"
 
             if prereq and not check_prereq(prereq, prereq_invert):
