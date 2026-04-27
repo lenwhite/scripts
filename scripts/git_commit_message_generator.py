@@ -160,7 +160,7 @@ Only write the commit message, or NOT ENOUGH CONTEXT if the meaning of the chang
 
 def agent_generate_commit_message(
     prompt,
-    model="external-gpt-core-beta-mini",
+    model,
     max_completion_tokens=250,
     temperature=0.0,
 ):
