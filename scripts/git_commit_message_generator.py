@@ -91,13 +91,6 @@ def get_commit_history():
     return result.strip() if result.strip() else None
 
 
-def stage_all_changes():
-    result = try_subprocess_run(
-        ["git", "add", "-A"], error_msg="Error staging changes", exit_on_error=False
-    )
-    return result is not None
-
-
 def truncate_context(context, max_length=25000):
     if len(context) > max_length:
         context = context[:max_length] + "\n[Content truncated due to size...]"
@@ -194,13 +187,13 @@ def agent_generate_commit_message(
         return None
 
 
-def commit_changes(message):
-    result = try_subprocess_run(
-        ["git", "commit", "-m", message],
-        error_msg="Error committing changes",
-        exit_on_error=False,
-    )
-    return result is not None
+def commit_changes(message, flags=None):
+    cmd = ["git", "commit", "-m", message] + (flags or [])
+    try:
+        subprocess.run(cmd, check=True)
+        return True
+    except subprocess.CalledProcessError:
+        return False
 
 
 def parse_arguments():
@@ -221,7 +214,18 @@ def parse_arguments():
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Generate commit message without actually committing",
+        help="Pass --dry-run to git commit (show what would be committed without committing)",
+    )
+    parser.add_argument(
+        "--no-verify",
+        action="store_true",
+        help="Pass --no-verify to git commit (skip pre-commit and commit-msg hooks)",
+    )
+    parser.add_argument(
+        "-e",
+        "--edit",
+        action="store_true",
+        help="Pass -e to git commit (open generated message in editor before committing)",
     )
     return parser.parse_args()
 
@@ -252,12 +256,16 @@ def main():
         Panel(commit_message, title="Generated Commit Message", border_style="green")
     )
 
+    commit_flags = []
     if args.dry_run:
-        console.print("[bold yellow]Dry run mode: Changes not committed.[/bold yellow]")
-        return
+        commit_flags.append("--dry-run")
+    if args.no_verify:
+        commit_flags.append("--no-verify")
+    if args.edit:
+        commit_flags.append("-e")
 
     console.print("[bold cyan]Committing changes...[/bold cyan]")
-    if commit_changes(commit_message):
+    if commit_changes(commit_message, commit_flags):
         console.print("[bold green]Successfully committed changes![/bold green]")
     else:
         console.print("[bold red]Failed to commit changes.[/bold red]")
