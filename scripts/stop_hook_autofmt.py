@@ -8,6 +8,19 @@ Multi-language autoformat script.
 
 Formats and checks files based on their type, running commands in order
 from cheapest to most expensive, failing early if any command fails.
+
+Positioning
+-----------
+This is a personal, local CLI tool - think `ripgrep`, not a repo-committed
+formatter. It is intentionally NOT coupled to any specific repo's tooling
+config (no reading of `pyproject.toml`, no respect for project-level
+formatter settings beyond detection-based opt-in). Requirements here are
+shaped by personal/agentic workflows, which differ from repo-level CI
+configurations.
+
+Project-specific behavior is handled via in-script prereq detection
+(e.g., mypy only runs when a project's `pyproject.toml` mentions it),
+not by reading project config files.
 """
 
 import os
@@ -32,8 +45,14 @@ class FileTypeConfig(TypedDict):
     commands: list[CommandConfig]
 
 
-# File type definitions with commands ordered cheapest → most expensive
-# Commands can have "prereq": if the prereq command fails, the command is skipped
+# File type definitions with commands ordered cheapest → most expensive.
+# Commands can have "prereq": if the prereq command fails, the command is skipped.
+#
+# TODO: per the positioning in the module docstring, FILE_TYPES is currently
+# embedded as the single source of config. It may move to an external local
+# config (e.g., ~/.config/autofmt/config.toml) with optional per-project
+# overrides (e.g., .autofmt.toml in a repo root). Not committed to a specific
+# design yet - this note exists to flag the intent.
 FILE_TYPES: dict[str, FileTypeConfig] = {
     "python": {
         "extensions": [".py"],
