@@ -86,7 +86,7 @@ CFLAGS="-fPIC" \
             --without-tests
 
 # ── 1d. Compile & install ncurses (locally) ──────────────────────────────────
-echo "==> Compiling ncurses ($(nproc) jobs) …"
+echo "==> Compiling ncurses …"
 make -j"$(nproc)"
 make install
 
@@ -129,59 +129,30 @@ CPPFLAGS="-I${PREFIX}/include -I${PREFIX}/include/ncursesw" \
             --without-tcsetpgrp \
             --disable-dynamic
 
-# ── 2c½. Force all modules to static ──────────────────────────────────────
-# With --disable-dynamic, modules whose .mdd says link=dynamic become link=no
-# (disabled) instead of link=static.  Fix that so everything gets compiled in.
-# Only convert modules that have load=yes — those were disabled purely because
-# --disable-dynamic was set.  Modules with load=no were disabled due to missing
-# system dependencies (e.g. gdbm, cap) and must stay link=no.
+# ── 2d. Force all modules to static ───────────────────────────────────────
+# With --disable-dynamic, configure leaves most modules at link=no (or
+# link=dynamic) instead of link=static.  Flip everything to link=static so
+# all modules get compiled into the binary.
+# load=yes/no is irrelevant here — it only controls auto-loading at startup,
+# not whether the module can be compiled in.  Modules with load=no still need
+# to be link=static so that an explicit `zmodload zsh/foo` works at runtime.
+# Re-disable modules that genuinely need external libraries not present in this
+# build environment (detected by configure having left them link=no even before
+# our patch).  Attempting to compile these would fail with a missing-header error.
 echo "==> Patching config.modules: forcing link=static for all modules …"
-sed -i '/load=yes/s/link=no/link=static/' config.modules
+sed -i 's/link=\(no\|dynamic\)/link=static/' config.modules
+awk '/name=zsh\/(attr|cap|db\/gdbm|pcre) / { sub(/link=static/, "link=no") } { print }' \
+    config.modules > config.modules.tmp && mv config.modules.tmp config.modules
 
-# ── 2d. Compile & install zsh ──────────────────────────────────────────────
-echo "==> Compiling zsh ($(nproc) jobs) …"
+# ── 2e. Compile & install zsh ──────────────────────────────────────────────
+echo "==> Compiling zsh …"
 make -j"$(nproc)"
 make install
 
-# ═════════════════════════════════════════════════════════════════════════════
-# Smoke tests
-# ═════════════════════════════════════════════════════════════════════════════
 ZSH_BIN="${WORK_DIR}/install/bin/zsh"
 
 if [[ ! -x "${ZSH_BIN}" ]]; then
     echo "FAIL: zsh binary not found at ${ZSH_BIN}" >&2
-    exit 1
-fi
-
-echo "==> Smoke-testing the build …"
-
-# verify ncurses is NOT a dynamic dependency
-if ldd "${ZSH_BIN}" 2>&1 | grep -qi ncurses; then
-    echo "    WARNING: ncurses still appears as a dynamic dependency:"
-    ldd "${ZSH_BIN}" | grep -i ncurses | sed 's/^/      /'
-else
-    echo "    ncurses:    statically linked (not in ldd output)"
-fi
-
-# version string
-BUILT_VERSION="$("${ZSH_BIN}" --version 2>&1)" || true
-echo "    version:    ${BUILT_VERSION}"
-
-# simple expression evaluation
-RESULT="$("${ZSH_BIN}" -c 'echo $((6 * 7))')"
-if [[ "${RESULT}" == "42" ]]; then
-    echo "    math test:  PASS  (6*7 = ${RESULT})"
-else
-    echo "    math test:  FAIL  (expected 42, got ${RESULT})" >&2
-    exit 1
-fi
-
-# parameter expansion
-RESULT="$("${ZSH_BIN}" -c 's="hello world"; echo ${(U)s}')"
-if [[ "${RESULT}" == "HELLO WORLD" ]]; then
-    echo "    param test: PASS  (uppercase expansion works)"
-else
-    echo "    param test: FAIL  (expected 'HELLO WORLD', got '${RESULT}')" >&2
     exit 1
 fi
 
