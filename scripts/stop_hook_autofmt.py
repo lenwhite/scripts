@@ -1,4 +1,3 @@
-#!/lxhome/lianjie/.local/bin/uv run
 # /// script
 # requires-python = ">=3.12"
 # dependencies = ["click>=8.1.8"]
