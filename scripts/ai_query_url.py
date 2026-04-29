@@ -1,3 +1,14 @@
+# /// script
+# requires-python = ">=3.12"
+# dependencies = [
+#     "click>=8.3.3",
+#     "httpx>=0.28.1",
+#     "markdownify>=1.2.2",
+#     "openai>=2.33.0",
+#     "rich>=15.0.0",
+# ]
+# ///
+
 """Fetch-and-extract: fetch a web page, convert to markdown, extract via LLM."""
 
 from __future__ import annotations
