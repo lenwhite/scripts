@@ -4,6 +4,7 @@
 # dependencies = [
 #   "click",
 #   "openai",
+#   "pydantic",
 #   "rich",
 # ]
 # ///
@@ -13,11 +14,23 @@ import subprocess
 import sys
 
 import click
+from pydantic import BaseModel, Field
 from rich.console import Console
 from rich.panel import Panel
 from openai import OpenAI
 
 console = Console()
+
+
+class CommitMessage(BaseModel):
+    not_enough_context: bool = Field(
+        description="Set to true if the intent of the changes is ambiguous, or otherwise unclear from the diff."
+        "If the intent is clear, set to false and write a commit message.",
+    )
+    message: str = Field(
+        description="The conventional-commit message. "
+        "Leave empty when not_enough_context is true.",
+    )
 
 
 def try_subprocess_run(args, *, error_msg, exit_on_error=True):
@@ -144,8 +157,6 @@ Based on the diff context, generate a concise, one-line commit message following
 ✅ If multiple distinct changes are present, focus on the primary or most impactful change.
 ❌ Exclude issue tracker numbers, ticket references, or URLs
 
-Only write the commit message, or NOT ENOUGH CONTEXT if the meaning of the changes is not clear.
-
 <context>
 {context}
 </context>
@@ -168,22 +179,26 @@ def agent_generate_commit_message(
     base_url = os.environ.get("OPENAI_BASE_URL")
     client = OpenAI(api_key=api_key, base_url=base_url)
     try:
-        response = client.chat.completions.create(
+        response = client.chat.completions.parse(
             model=model,
             messages=[
                 {
                     "role": "system",
-                    "content": "You are an experienced developer. "
-                    "Having just written some code, you are now committing that code to git.",
+                    "content": "Review code and suggest a commit message based on its intention",
                 },
-                {"role": "user", "content": prompt},
+                {"role": "system", "content": prompt},
             ],
+            response_format=CommitMessage,
             max_completion_tokens=max_completion_tokens,
             temperature=temperature,
         )
 
-        content = response.choices[0].message.content
-        return content.strip() if content else None
+        parsed = response.choices[0].message.parsed
+        if parsed is None:
+            return None
+        if parsed.not_enough_context:
+            return "NOT ENOUGH CONTEXT"
+        return parsed.message.strip() if parsed.message else None
 
     except Exception as e:
         console.print(f"[bold red]Error generating commit message:[/bold red] {str(e)}")
