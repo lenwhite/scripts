@@ -32,35 +32,6 @@ SECONDARY_MODEL = "gpt-4.1-mini"
 console = Console(stderr=True)
 
 # ---------------------------------------------------------------------------
-# URL validation
-# ---------------------------------------------------------------------------
-
-
-def validate_url(url: str) -> str:
-    """Validate and normalise *url*. Returns the cleaned URL or raises."""
-    if len(url) > MAX_URL_LENGTH:
-        raise ValueError(f"URL exceeds {MAX_URL_LENGTH} characters")
-
-    parsed = urlparse(url)
-
-    if parsed.scheme not in ("http", "https"):
-        raise ValueError(f"Unsupported scheme: {parsed.scheme!r}")
-
-    if parsed.username or parsed.password:
-        raise ValueError("URLs with embedded credentials are not allowed")
-
-    hostname = parsed.hostname or ""
-    if len(hostname.split(".")) < 2:
-        raise ValueError(f"Hostname looks invalid: {hostname!r}")
-
-    # Upgrade http → https
-    if parsed.scheme == "http":
-        url = "https" + url[4:]
-
-    return url
-
-
-# ---------------------------------------------------------------------------
 # Redirect policy
 # ---------------------------------------------------------------------------
 
@@ -223,7 +194,6 @@ def _extract(markdown: str, prompt: str, *, model: str) -> str:
     client = _make_client()
     resp = client.chat.completions.create(
         model=model,
-        max_tokens=4096,
         messages=[{"role": "user", "content": _build_prompt(markdown, prompt)}],
     )
     choice = resp.choices[0]
@@ -236,24 +206,17 @@ def _extract(markdown: str, prompt: str, *, model: str) -> str:
 
 
 def fetch_and_extract(url: str, prompt: str, *, model: str = SECONDARY_MODEL) -> str:
-    """Fetch *url*, convert to markdown, and extract an answer to *prompt*."""
-    url = validate_url(url)
-
-    # 1. Check cache
     cached = _cache.get(url)
     if cached is not None:
         console.print("[dim]cache hit[/dim]")
         markdown = cached.markdown
         content_type = cached.content_type
     else:
-        # 2. Fetch
         console.print(f"[dim]fetching {url}[/dim]")
         body, content_type, status_code = _fetch(url)
 
-        # 3. Convert
         markdown = _to_markdown(body, content_type)
 
-        # Store in cache
         _cache.put(
             url,
             CacheEntry(
@@ -268,10 +231,8 @@ def fetch_and_extract(url: str, prompt: str, *, model: str = SECONDARY_MODEL) ->
     if "text/markdown" in content_type and len(markdown) <= MAX_CHARS_FOR_MODEL:
         return markdown
 
-    # 4. Truncate
     truncated = _truncate(markdown)
 
-    # 5. Extract
     return _extract(truncated, prompt, model=model)
 
 
