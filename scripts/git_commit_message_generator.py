@@ -2,6 +2,7 @@
 # /// script
 # requires-python = ">=3.12"
 # dependencies = [
+#   "click",
 #   "openai",
 #   "rich",
 # ]
@@ -10,7 +11,8 @@
 import os
 import subprocess
 import sys
-import argparse
+
+import click
 from rich.console import Console
 from rich.panel import Panel
 from openai import OpenAI
@@ -197,49 +199,32 @@ def commit_changes(message, flags=None):
         return False
 
 
-def parse_arguments():
-    parser = argparse.ArgumentParser(
-        description="Generate commit messages using OpenAI models."
-    )
-    parser.add_argument(
-        "comments",
-        nargs="?",
-        default="",
-        help="User comments to include in the commit message generation prompt",
-    )
-    parser.add_argument(
-        "--model",
-        default="gpt-4.1",
-        help="Model to use for generation (default: gpt-4.1)",
-    )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Pass --dry-run to git commit (show what would be committed without committing)",
-    )
-    parser.add_argument(
-        "--no-verify",
-        action="store_true",
-        help="Pass --no-verify to git commit (skip pre-commit and commit-msg hooks)",
-    )
-    parser.add_argument(
-        "-e",
-        "--edit",
-        action="store_true",
-        help="Pass -e to git commit (open generated message in editor before committing)",
-    )
-    return parser.parse_args()
-
-
-def main():
-    args = parse_arguments()
-
+@click.command(help="Generate commit messages using OpenAI models.")
+@click.argument("comments", default="")
+@click.option("--model", default="gpt-4.1", help="Model to use for generation.")
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Pass --dry-run to git commit (show what would be committed without committing).",
+)
+@click.option(
+    "--no-verify",
+    is_flag=True,
+    help="Pass --no-verify to git commit (skip pre-commit and commit-msg hooks).",
+)
+@click.option(
+    "-e",
+    "--edit",
+    is_flag=True,
+    help="Pass -e to git commit (open generated message in editor before committing).",
+)
+def main(comments, model, dry_run, no_verify, edit):
     if not is_git_repository():
         console.print("[bold red]Error:[/bold red] Not in a git repository.")
         sys.exit(1)
 
-    prompt = assemble_prompt(args.comments)
-    commit_message = agent_generate_commit_message(prompt, model=args.model)
+    prompt = assemble_prompt(comments)
+    commit_message = agent_generate_commit_message(prompt, model=model)
 
     if commit_message == "NOT ENOUGH CONTEXT":
         console.print(
@@ -258,11 +243,11 @@ def main():
     )
 
     commit_flags = []
-    if args.dry_run:
+    if dry_run:
         commit_flags.append("--dry-run")
-    if args.no_verify:
+    if no_verify:
         commit_flags.append("--no-verify")
-    if args.edit:
+    if edit:
         commit_flags.append("-e")
 
     console.print("[bold cyan]Committing changes...[/bold cyan]")
