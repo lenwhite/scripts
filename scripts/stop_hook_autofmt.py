@@ -56,7 +56,17 @@ FILE_TYPES: dict[str, FileTypeConfig] = {
     "python": {
         "extensions": [".py"],
         "commands": [
-            {"cmd": ["uvx", "ruff", "format"], "append_files": True},
+            {
+                "cmd": ["uv", "run", "ruff", "format"],
+                "append_files": True,
+                "prereq": ["test", "-f", "pyproject.toml"],
+            },
+            {
+                "cmd": ["uvx", "ruff", "format"],
+                "append_files": True,
+                "prereq": ["test", "-f", "pyproject.toml"],
+                "prereq_invert": True,
+            },
             {"cmd": ["uvx", "ruff", "check"], "append_files": True},
             # {
             #     "cmd": ["uvx", "ty", "check"],
@@ -68,6 +78,11 @@ FILE_TYPES: dict[str, FileTypeConfig] = {
                 "cmd": ["uv", "run", "mypy"],
                 "append_files": True,
                 "prereq": ["rg", "-q", "mypy", "pyproject.toml"],
+            },
+            {
+                "cmd": ["uv", "run", "pyright"],
+                "append_files": True,
+                "prereq": ["rg", "-q", "pyright", "pyproject.toml"],
             },
         ],
     },
