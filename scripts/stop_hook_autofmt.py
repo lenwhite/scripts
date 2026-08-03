@@ -22,6 +22,7 @@ Project-specific behavior is handled via in-script prereq detection
 not by reading project config files.
 """
 
+import json
 import os
 import subprocess
 import sys
@@ -42,6 +43,58 @@ class CommandConfig(TypedDict):
 class FileTypeConfig(TypedDict):
     extensions: list[str]
     commands: list[CommandConfig]
+
+
+def detect_js_runner() -> list[str]:
+    """Pick the JS package runner from lockfiles in the cwd."""
+    if Path("bun.lockb").exists() or Path("bun.lock").exists():
+        return ["bunx"]
+    if Path("yarn.lock").exists():
+        return ["yarn", "dlx"]
+    if Path("pnpm-lock.yaml").exists():
+        return ["pnpm", "dlx"]
+    return ["npx"]
+
+
+def detect_biome() -> bool:
+    """Return True if biome is configured for this project."""
+    if Path("biome.json").exists() or Path("biome.jsonc").exists():
+        return True
+    pkg = Path("package.json")
+    if not pkg.exists():
+        return False
+    try:
+        data = json.loads(pkg.read_text())
+    except (json.JSONDecodeError, OSError):
+        return False
+    deps = {**data.get("dependencies", {}), **data.get("devDependencies", {})}
+    return "@biomejs/biome" in deps
+
+
+def build_js_commands() -> list[CommandConfig]:
+    runner = detect_js_runner()
+    if detect_biome():
+        return [
+            {
+                "cmd": [
+                    *runner,
+                    "@biomejs/biome",
+                    "check",
+                    "--write",
+                    "--error-on-warnings",
+                ],
+                "append_files": True,
+            },
+            {"cmd": [*runner, "tsc", "--noEmit"], "append_files": False},
+        ]
+    return [
+        {"cmd": [*runner, "prettier", "--write"], "append_files": True},
+        {"cmd": [*runner, "tsc", "--noEmit"], "append_files": False},
+        {
+            "cmd": [*runner, "eslint", "--max-warnings", "0", "--no-warn-ignored"],
+            "append_files": True,
+        },
+    ]
 
 
 # File type definitions with commands ordered cheapest → most expensive.
@@ -88,14 +141,7 @@ FILE_TYPES: dict[str, FileTypeConfig] = {
     },
     "typescript or javascript": {
         "extensions": [".js", ".ts", ".jsx", ".tsx"],
-        "commands": [
-            {"cmd": ["npx", "prettier", "--write"], "append_files": True},
-            {"cmd": ["npx", "tsc", "--noEmit"], "append_files": False},
-            {
-                "cmd": ["npx", "eslint", "--max-warnings", "0", "--no-warn-ignored"],
-                "append_files": True,
-            },
-        ],
+        "commands": build_js_commands(),
     },
 }
 
