@@ -167,8 +167,7 @@ Based on the diff context, generate a concise, one-line commit message following
 def agent_generate_commit_message(
     prompt,
     model,
-    max_completion_tokens=250,
-    temperature=0.0,
+    max_output_tokens=250,
 ):
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
@@ -179,21 +178,16 @@ def agent_generate_commit_message(
     base_url = os.environ.get("OPENAI_BASE_URL")
     client = OpenAI(api_key=api_key, base_url=base_url)
     try:
-        response = client.chat.completions.parse(
+        response = client.responses.parse(
             model=model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": "Review code and suggest a commit message based on its intention",
-                },
-                {"role": "system", "content": prompt},
-            ],
-            response_format=CommitMessage,
-            max_completion_tokens=max_completion_tokens,
-            temperature=temperature,
+            instructions="Review code and suggest a commit message based on its intention",
+            input=prompt,
+            text_format=CommitMessage,
+            max_output_tokens=max_output_tokens,
+            store=False,
         )
 
-        parsed = response.choices[0].message.parsed
+        parsed = response.output_parsed
         if parsed is None:
             return None
         if parsed.not_enough_context:
@@ -216,7 +210,7 @@ def commit_changes(message, flags=None):
 
 @click.command(help="Generate commit messages using OpenAI models.")
 @click.argument("comments", default="")
-@click.option("--model", default="gpt-4.1", help="Model to use for generation.")
+@click.option("--model", default="gpt-5.6-luna", help="Model to use for generation.")
 @click.option(
     "--dry-run",
     is_flag=True,
