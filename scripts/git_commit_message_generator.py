@@ -14,10 +14,10 @@ import subprocess
 import sys
 
 import click
+from openai import OpenAI
 from pydantic import BaseModel, Field
 from rich.console import Console
 from rich.panel import Panel
-from openai import OpenAI
 
 console = Console()
 
@@ -38,8 +38,7 @@ def try_subprocess_run(args, *, error_msg, exit_on_error=True):
         result = subprocess.run(
             args,
             check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             text=True,
             encoding="utf-8",
             errors="replace",
@@ -186,17 +185,32 @@ def agent_generate_commit_message(
             max_output_tokens=max_output_tokens,
             store=False,
         )
-
-        parsed = response.output_parsed
-        if parsed is None:
-            return None
-        if parsed.not_enough_context:
-            return "NOT ENOUGH CONTEXT"
-        return parsed.message.strip() if parsed.message else None
-
     except Exception as e:
-        console.print(f"[bold red]Error generating commit message:[/bold red] {str(e)}")
-        return None
+        console.print(
+            f"[bold red]Error calling the model API:[/bold red] "
+            f"{type(e).__name__}: {e}\n"
+            f"[dim]model={model} base_url={base_url or 'https://api.openai.com/v1 (default)'}[/dim]"
+        )
+        raise SystemExit(1) from e
+
+    parsed = response.output_parsed
+    if parsed is None:
+        console.print(
+            "[bold red]Error:[/bold red] Model returned no parsable output "
+            f"(status={getattr(response, 'status', 'unknown')}, "
+            f"incomplete_details={getattr(response, 'incomplete_details', None)})."
+        )
+        raise SystemExit(1)
+    if parsed.not_enough_context:
+        return "NOT ENOUGH CONTEXT"
+
+    message = parsed.message.strip() if parsed.message else ""
+    if not message:
+        console.print(
+            "[bold red]Error:[/bold red] Model returned an empty commit message."
+        )
+        raise SystemExit(1)
+    return message
 
 
 def commit_changes(message, flags=None):
@@ -240,12 +254,6 @@ def main(comments, model, dry_run, no_verify, edit):
             "[bold red]Failed to generate commit message. Rerun the script with more context.[/bold red]"
         )
         sys.exit(1)
-
-    if not commit_message:
-        console.print(
-            "[bold red]Failed to generate commit message. Using default message.[/bold red]"
-        )
-        commit_message = "Update code based on recent changes"
 
     console.print(
         Panel(commit_message, title="Generated Commit Message", border_style="green")
