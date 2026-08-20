@@ -14,7 +14,7 @@ import subprocess
 import sys
 
 import click
-from openai import OpenAI
+from openai import OpenAI, OpenAIError
 from pydantic import BaseModel, Field
 from rich.console import Console
 from rich.panel import Panel
@@ -166,7 +166,7 @@ Based on the diff context, generate a concise, one-line commit message following
 def agent_generate_commit_message(
     prompt,
     model,
-    max_output_tokens=250,
+    max_output_tokens=1024,
 ):
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
@@ -176,41 +176,46 @@ def agent_generate_commit_message(
         sys.exit(1)
     base_url = os.environ.get("OPENAI_BASE_URL")
     client = OpenAI(api_key=api_key, base_url=base_url)
-    try:
-        response = client.responses.parse(
-            model=model,
-            instructions="Review code and suggest a commit message based on its intention",
-            input=prompt,
-            text_format=CommitMessage,
-            max_output_tokens=max_output_tokens,
-            store=False,
-        )
-    except Exception as e:
-        console.print(
-            f"[bold red]Error calling the model API:[/bold red] "
-            f"{type(e).__name__}: {e}\n"
-            f"[dim]model={model} base_url={base_url or 'https://api.openai.com/v1 (default)'}[/dim]"
-        )
-        raise SystemExit(1) from e
+    last_error = None
+    for attempt in range(1, 4):
+        try:
+            response = client.responses.parse(
+                model=model,
+                instructions="Review code and suggest a commit message based on its intention",
+                input=prompt,
+                text_format=CommitMessage,
+                max_output_tokens=max_output_tokens,
+                store=False,
+            )
+        except OpenAIError as e:
+            last_error = (
+                f"Error calling the model API: {type(e).__name__}: {e}\n"
+                f"model={model} base_url={base_url or 'https://api.openai.com/v1 (default)'}"
+            )
+        else:
+            parsed = response.output_parsed
+            if parsed is None:
+                last_error = (
+                    "Model returned no parsable output "
+                    f"(status={getattr(response, 'status', 'unknown')}, "
+                    f"incomplete_details={getattr(response, 'incomplete_details', None)})."
+                )
+            elif parsed.not_enough_context:
+                return "NOT ENOUGH CONTEXT"
+            else:
+                message = parsed.message.strip() if parsed.message else ""
+                if message:
+                    return message
+                last_error = "Model returned an empty commit message."
 
-    parsed = response.output_parsed
-    if parsed is None:
-        console.print(
-            "[bold red]Error:[/bold red] Model returned no parsable output "
-            f"(status={getattr(response, 'status', 'unknown')}, "
-            f"incomplete_details={getattr(response, 'incomplete_details', None)})."
-        )
-        raise SystemExit(1)
-    if parsed.not_enough_context:
-        return "NOT ENOUGH CONTEXT"
+        if attempt < 3:
+            console.print(
+                f"[bold yellow]Generation attempt {attempt} failed; retrying "
+                f"({attempt + 1}/3)...[/bold yellow]"
+            )
 
-    message = parsed.message.strip() if parsed.message else ""
-    if not message:
-        console.print(
-            "[bold red]Error:[/bold red] Model returned an empty commit message."
-        )
-        raise SystemExit(1)
-    return message
+    console.print(f"[bold red]Error:[/bold red] {last_error}")
+    raise SystemExit(1)
 
 
 def commit_changes(message, flags=None):
