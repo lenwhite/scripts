@@ -1,5 +1,6 @@
 __pycache__
 .claude
+private
 
 # deliberately not saving `uv.lock` - the real resolution is determined by individual scripts
 uv.lock
