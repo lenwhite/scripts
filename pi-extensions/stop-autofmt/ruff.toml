@@ -1,0 +1,9 @@
+target-version = "py312"
+
+[lint]
+select = ["E4", "E7", "E9", "F", "B", "S", "UP", "I", "C4"]
+
+# S603: not autofixable, and running a runtime-built argv is this script's
+# purpose. Commands come from the hardcoded FILE_TYPES table, never user input,
+# and always argv-list form (never shell=True), so shell injection isn't possible.
+ignore = ["S603"]
