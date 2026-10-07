@@ -1,5 +1,5 @@
 ---
-name: cleanup-ts-nits
+name: cleanup-react-nits
 description: Clean up common TypeScript/React code patterns on staged files
 argument-hint: "[files/patterns]"
 ---

@@ -34,7 +34,7 @@ If the staged set contains test files (`*.test.*`, `*.spec.*`, `tests/**`), run 
 ## Stage 5 — Stage, then TypeScript nits (only if TS files changed)
 
 1. `git add -A` the touched files again.
-2. If the staged set contains `.ts`/`.tsx` files, run the **cleanup-ts-nits** workflow with a strong subagent, scoped to exactly those staged TS files. Otherwise skip and say so.
+2. If the staged set contains `.ts`/`.tsx` files, run the **cleanup-react-nits** workflow with a strong subagent, scoped to exactly those staged TS files. Otherwise skip and say so.
 3. `git add -A` the touched files again.
 
 ## Stage 6 — Review the staged diff
