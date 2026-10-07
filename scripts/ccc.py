@@ -7,10 +7,11 @@
 # ///
 
 import json
-import shutil
-from pathlib import Path
 import re
+import shutil
 import sys
+from pathlib import Path
+
 import click
 
 
@@ -38,7 +39,6 @@ def delete_hooks(hooks: list, pattern: str) -> None:
 @click.group()
 def cli():
     """Claude Code config shortcut."""
-    pass
 
 
 @cli.command()

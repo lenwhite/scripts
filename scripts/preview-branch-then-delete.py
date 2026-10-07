@@ -6,9 +6,10 @@
 # ]
 # ///
 
-import subprocess
 import argparse
+import subprocess
 import sys
+
 from rich.console import Console
 
 console = Console()

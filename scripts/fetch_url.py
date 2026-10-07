@@ -42,7 +42,7 @@ def _is_permitted_redirect(original: str, redirect: str) -> bool:
     if redir.username or redir.password:
         return False
 
-    strip = lambda h: _WWW_RE.sub("", h or "")  # noqa: E731
+    strip = lambda h: _WWW_RE.sub("", h or "")
     return strip(orig.hostname) == strip(redir.hostname)
 
 
