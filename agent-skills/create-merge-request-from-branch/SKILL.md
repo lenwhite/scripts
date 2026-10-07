@@ -1,6 +1,6 @@
 ---
 name: create-merge-request-from-branch
-description: Create a draft merge request from the current branch using glab
+description: Create a draft merge/pull request from the current branch
 argument-hint: "[scope/issue/title hints]"
 ---
 Create a merge request from the branch.
@@ -11,13 +11,14 @@ Create a merge request from the branch.
     - if we're on `main` and there's unstaged changes - stash, create a feature branch and commit the staged changes
     - otherwise, if we're already on a feature branch, examine the git history for context
 - ask the user for context if it's not obvious from the commit history
-- run `glab mr list --merged --author <username>` (current GitLab user, from `glab auth status`) to list the previous merge requests as a reference. if there are no merge requests from this author, use other authors as a reference `glab mr list --merged` 
-- use `glab mr view <number>` to retrieve details of 3 previous merge requests as a reference
+- use the hosting platform's CLI for all MR/PR operations - infer which one from context (git remote, CI config, which CLI is authenticated)
+- list the current user's previously merged merge requests as a reference. if there are no merge requests from this author, use other authors as a reference
+- retrieve details of 3 previous merge requests as a reference
 - never give a detailed breakdown of code-level changes in the MR, beyond a short summary
-- before creating the MR, find the pipeline's linting/formatting/test rules (e.g. `.gitlab-ci.yml` and any included CI files, `package.json` scripts, lint/format/test configs) and run them locally. Fix any failures (commit and push the fixes) and only proceed once they all pass
-- create the mr with `glab mr create --draft --title <title> --description <description>` with `<username>` as reviewer (as a placeholder)
+- before creating the MR, find the pipeline's linting/formatting/test rules (e.g. `.gitlab-ci.yml` / `.github/workflows/*` and any included CI files, `package.json` scripts, lint/format/test configs) and run them locally. Fix any failures (commit and push the fixes) and only proceed once they all pass
+- create the mr as a draft, with a title and description, set the author as a reviewer `@me`(placeholder, set reviewer if self-review not supported)
 
-## Example 1 - On `main` with unstaged changes
+## Example 1 - On `main` with unstaged changes (GitLab)
 
 ```bash
 # 1) Check git status
@@ -67,7 +68,7 @@ glab mr create --draft \
   --description "..."
 ```
 
-## Example 2 — Already on a feature branch, history is clear
+## Example 2 — Already on a feature branch, history is clear (GitHub)
 
 
 ```bash
@@ -83,24 +84,24 @@ git log --oneline -n 5
 # Example commit:
 # 9c1a3de feat(profile): enable avatar upload with client-side validation
 
-# Reference past MRs by author
-glab mr list --merged --author <username>
+# Reference past PRs by author
+gh pr list --state merged --author @me
 # If empty, fallback:
-glab mr list --merged
+gh pr list --state merged
 
-# View 3 prior MRs to mirror format/sections
-glab mr view <number>
-glab mr view <number>
-glab mr view <number>
+# View 3 prior PRs to mirror format/sections
+gh pr view <number>
+gh pr view <number>
+gh pr view <number>
 
 # Find and run the pipeline's lint/format/test rules, fix failures, then commit + push
-cat .gitlab-ci.yml
+cat .github/workflows/*.yml
 cat package.json
 yarn lint && yarn format:check && yarn test
 git add -A && git commit -m "chore: fix lint/format/test failures" && git push
 
-# Create draft MR
-glab mr create --draft \
+# Create draft PR
+gh pr create --draft \
   --title "feat(profile): avatar upload with client-side validation" \
-  --description "..."
+  --body "..."
 ```
