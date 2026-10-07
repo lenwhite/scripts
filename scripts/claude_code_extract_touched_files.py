@@ -1,4 +1,3 @@
-#!/lxhome/lianjie/.local/bin/uv run
 # /// script
 # requires-python = ">=3.12"
 # dependencies = ["click>=8.1.8"]
@@ -133,12 +132,12 @@ def main(jsonl_file: Path | None, workers: int) -> None:
             click.echo(f"Error: {jsonl_file} does not exist", err=True)
             sys.exit(1)
 
-    if not jsonl_file.suffix == ".jsonl":
+    if jsonl_file.suffix != ".jsonl":
         click.echo(f"Warning: {jsonl_file} does not have .jsonl extension", err=True)
 
     try:
         paths = extract_paths(jsonl_file)
-    except Exception as e:
+    except (OSError, UnicodeDecodeError) as e:
         click.echo(f"Error processing file: {e}", err=True)
         sys.exit(1)
 

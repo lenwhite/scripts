@@ -1,4 +1,3 @@
-#!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.12"
 # dependencies = [
@@ -27,13 +26,13 @@ def parse_arguments():
 
 
 def run_git_command(
-    command, error_message="Git command failed", expected_return_codes=[0]
+    command, error_message="Git command failed", expected_return_codes=(0,)
 ):
     """Run a git command and handle errors."""
     try:
         # Remove check=True, capture output, handle return code manually
         result = subprocess.run(
-            command, capture_output=True, text=True, encoding="utf-8"
+            command, capture_output=True, text=True, encoding="utf-8", check=False
         )
 
         if result.returncode not in expected_return_codes:

@@ -113,7 +113,10 @@ FILE_TYPES: dict[str, FileTypeConfig] = {
                 "cmd": ["uv", "run", "--with", "ruff", "ruff", "format"],
                 "append_files": True,
             },
-            {"cmd": ["uv", "run", "--with", "ruff", "ruff", "check"], "append_files": True},
+            {
+                "cmd": ["uv", "run", "--with", "ruff", "ruff", "check"],
+                "append_files": True,
+            },
             # {
             #     "cmd": ["uv", "run", "--with", "ty", "ty", "check"],
             #     "append_files": True,
@@ -180,7 +183,7 @@ env.pop("VIRTUAL_ENV", None)
 
 def check_prereq(prereq: list[str], invert: bool = False) -> bool:
     """Run a prerequisite command. Returns True if prereq passes (exit 0), or inverted if invert=True."""
-    result = subprocess.run(prereq, capture_output=True, env=env)
+    result = subprocess.run(prereq, capture_output=True, env=env, check=False)
     passed = result.returncode == 0
     return not passed if invert else passed
 
@@ -198,7 +201,9 @@ def run_command(
     if append_files:
         full_cmd.extend(str(f) for f in files)
 
-    result = subprocess.run(full_cmd, capture_output=True, text=True, env=env)
+    result = subprocess.run(
+        full_cmd, capture_output=True, text=True, env=env, check=False
+    )
     output = result.stdout + result.stderr
     return result.returncode == 0, output
 
