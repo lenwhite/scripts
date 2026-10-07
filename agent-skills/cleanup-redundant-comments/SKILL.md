@@ -1,4 +1,5 @@
 ---
+name: cleanup-redundant-comments
 description: Remove redundant comments from changed files via per-file subagents
 argument-hint: "[files/areas]"
 ---
@@ -19,7 +20,3 @@ Instruct the subagent to:
 - Make ONLY changes to comments added/changed in this diff. (unless overridden below)
 - Assume the readers are highly proficient with the programming language. 
 - Bias towards removal.
-
-
----
-Additional context / files or areas to focus on (if any): $ARGUMENTS

@@ -1,4 +1,5 @@
 ---
+name: cleanup-ts-nits
 description: Clean up common TypeScript/React code patterns on staged files
 argument-hint: "[files/patterns]"
 ---
@@ -146,7 +147,3 @@ const profileOptions = useMemo(
   )}
 />
 ```
-
-
----
-Additional context / files or patterns to focus on (if any): $ARGUMENTS

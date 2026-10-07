@@ -1,14 +1,11 @@
 ---
+name: soundboard
 description: Act as a sounding board / sanity check without taking actions
 argument-hint: "[query]"
 ---
-Act as a sounding board / sanity check for the following query, without taking any actions:
+Act as a sounding board / sanity check for the user query below, without taking any actions.
 
----
-$ARGUMENTS
----
-
-Systemmatically:
+After reading the query, systematically:
 
 - State your immediate intuition, making as few assumptions as possible, then:
 - If needed, explore the codebase (using balanced subagents, in parallel) for more context and/or to verify user assumptions.

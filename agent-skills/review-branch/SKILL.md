@@ -1,4 +1,5 @@
 ---
+name: review-branch
 description: Review the current branch with a subagent, then address the findings with judgment
 argument-hint: "[subagent tier] [focus areas]"
 ---
@@ -14,6 +15,3 @@ Default review focus (unless overridden below): **simplification**, **overly def
 4. **Apply accepted changes** with precise edits; clean up now-unused imports/props/files.
 5. **Verify.** Type-check, lint touched paths, run relevant tests — all green.
 6. **Summarize** each finding with your decision (Fixed / Adapted / Rejected + why) and verification results.
-
----
-Subagent and/or focus areas to override the defaults (if any): $ARGUMENTS

@@ -1,4 +1,5 @@
 ---
+name: write-short-plan
 description: Produce a high-level plan file (background, decisions, architecture/invariants, files)
 argument-hint: "[topic / focus]"
 ---
@@ -59,6 +60,3 @@ After writing the plan - do an additional editing pass for brevity and clarity.
 </plan-specs>
 
 After the subagent produces this plan file - briefly review and check that it matches your understanding.
-
----
-Additional notes: $ARGUMENTS

@@ -1,4 +1,5 @@
 ---
+name: create-merge-request-from-branch
 description: Create a draft merge request from the current branch using glab
 argument-hint: "[scope/issue/title hints]"
 ---
@@ -103,7 +104,3 @@ glab mr create --draft \
   --title "feat(profile): avatar upload with client-side validation" \
   --description "..."
 ```
-
-
----
-Additional context for the MR — scope, linked issue, title/description hints (if any): $ARGUMENTS

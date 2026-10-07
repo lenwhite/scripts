@@ -1,4 +1,5 @@
 ---
+name: implement-plan
 description: Implement a plan file end-to-end via subagents, then clean up comments/tests/TS nits and review the staged diff
 argument-hint: "[extra instructions]"
 ---
@@ -7,13 +8,13 @@ Implement the plan end-to-end using subagents, then run the cleanup and review p
 - don't check any subagent's work
 - instruct subagents to never spawn subagents
 
-Plan file: **$1**
+Plan file: the plan from our current context (unless another is specified below).
 
-**Reusing existing workflows:** stages 3, 4, 5 and 6 reuse other prompt templates. Read the template body from `<name>.md` in the same directory as this template, strip the frontmatter and the trailing arguments line (after the final `---`), and paste it into the subagent prompt together with the concrete file list for this run.
+**Reusing existing workflows:** stages 3, 4, 5 and 6 reuse other skills. Read the template body from `../<name>/SKILL.md` relative to this skill's directory, strip the frontmatter, and paste it into the subagent prompt together with the concrete file list for this run.
 
 ## Stage 1 — Implement
 
-1. Read `$1` yourself so you can sanity-check the result later. Record the pre-existing git state (`git status --porcelain`, `git stash list`) so you can tell plan changes apart from prior work.
+1. Read the plan file yourself so you can sanity-check the result later. Record the pre-existing git state (`git status --porcelain`, `git stash list`) so you can tell plan changes apart from prior work.
 2. Spawn **one** strong subagent told to: read the plan at the absolute path, implement it fully, and report what it changed plus any deviations. It may edit files; it must not commit, push, or stage.
 
 ## Stage 2 — Stage
@@ -43,6 +44,3 @@ Run the **review-branch** workflow with a strong subagent, but **targeting the s
 ## Stage 7 - Apply review
 
 Then, instead of validating the findings yourself, spawn a strong subagent to validate and apply the review findings. Do NOT stage the final changes.
-
----
-Extra instructions / subagent tier overrides / areas to focus on (if any): $ARGUMENTS
