@@ -3,13 +3,13 @@ name: write-short-plan
 description: Produce a high-level plan file (background, decisions, architecture/invariants, files)
 argument-hint: "[topic / focus]"
 ---
-Produce a plan file for the work we've been discussing. Hand off any exploration done, decisions made, constraint decided on to a strong subagent, who will produce a plan file to the following specifications:
+Produce a plan file for the work we've been discussing. Hand off any exploration done, decisions made, constraints decided on to a strong subagent, who will produce a plan file to the following specifications:
 
 <plan-specs>
 
 ## Audience
 
-Write handling off the work to a competent senior engineer fresh to the work, without context of this conversation. That engineer can read the codebase, so don't restate what the code already says. Trust the engineer to make solid decisions.
+Write as if handing off the work to a competent senior engineer fresh to the work, without context of this conversation. That engineer can read the codebase, so don't restate what the code already says. Trust the engineer to make solid decisions.
 
 Anything decided, discovered, or ruled out here that isn't written down is lost.
 

@@ -3,7 +3,7 @@ name: cleanup-react-nits
 description: Clean up common TypeScript/React code patterns on staged files
 argument-hint: "[files/patterns]"
 ---
-Cleanup of some code patterns on staged files.
+Clean up some code patterns on staged files.
 
 ## Remove unnecessary type declarations and destructurings
 
@@ -42,6 +42,7 @@ export function useSearchProfiles(
 
 Prefer:
 
+```
 export function useSearchProfiles(
   { urlState, setUrlState }: {
     urlState: SearchUrlState;
@@ -65,7 +66,7 @@ export function useSearchProfiles(
 ```
 
 This:
-- Avoids exporting unecessary types which are not part of the module contract
+- Avoids exporting unnecessary types which are not part of the module contract
 - Reduces verbosity
 - Makes it easier to refer to the types when declaring functions
 
@@ -83,7 +84,7 @@ const filteredArray = [1, 2, undefined].filter(Boolean)
 
 ## Type casting
 
-Instead of casting api responses, prefer creating a zod schema whenever possible.
+Instead of casting API responses, prefer creating a zod schema whenever possible.
 
 ```typescript
 // Instead of
@@ -112,7 +113,7 @@ const { data } = response;
 ```
 
 ## Boolean React states
-For boolean react states tracking open/close states - use the useDisclosure utility from Mantine.
+For boolean React states tracking open/close states - use the useDisclosure utility from Mantine.
 
 ```typescript
 // Instead of
@@ -128,7 +129,7 @@ const [modelOpen, model] = useDisclosure();
 <Component onOpen={model.open} ... />
 ```
 
-## Prefer inline memorization at usage to improve code locality
+## Prefer inline memoization at usage to improve code locality
 
 ```tsx
 // Instead of

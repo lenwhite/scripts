@@ -8,7 +8,7 @@ Create a merge request from the branch.
 ## Detailed Instructions
 
 - check git status
-    - if we're on `main` and there's unstaged changes - stash, create a feature branch and commit the staged changes
+    - if we're on `main` and there are unstaged changes - stash, create a feature branch and commit the staged changes
     - otherwise, if we're already on a feature branch, examine the git history for context
 - ask the user for context if it's not obvious from the commit history
 - use the hosting platform's CLI for all MR/PR operations - infer which one from context (git remote, CI config, which CLI is authenticated)
@@ -16,9 +16,9 @@ Create a merge request from the branch.
 - retrieve details of 3 previous merge requests as a reference
 - never give a detailed breakdown of code-level changes in the MR, beyond a short summary
 - before creating the MR, find the pipeline's linting/formatting/test rules (e.g. `.gitlab-ci.yml` / `.github/workflows/*` and any included CI files, `package.json` scripts, lint/format/test configs) and run them locally. Fix any failures (commit and push the fixes) and only proceed once they all pass
-- create the mr as a draft, with a title and description, set the author as a reviewer `@me`(placeholder, set reviewer if self-review not supported)
+- create the MR as a draft, with a title and description, set the author as a reviewer `@me` (placeholder, set reviewer if self-review not supported)
 
-## Example 1 - On `main` with unstaged changes (GitLab)
+## Example 1 — On `main` with unstaged changes (GitLab)
 
 ```bash
 # 1) Check git status
@@ -37,7 +37,7 @@ git stash pop
 git add src/logger.ts
 git commit -m "feat(logging): add structured logger and request IDs"
 # Sync to remote
-git push -U origin feature/add-logging
+git push -u origin feature/add-logging
 
 # 5) Examine commit history for context
 git log --oneline -n 10
@@ -86,7 +86,7 @@ git log --oneline -n 5
 
 # Reference past PRs by author
 gh pr list --state merged --author @me
-# If empty, fallback:
+# If empty, fall back:
 gh pr list --state merged
 
 # View 3 prior PRs to mirror format/sections

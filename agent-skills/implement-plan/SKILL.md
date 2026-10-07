@@ -25,7 +25,7 @@ Plan file: the plan from our current context (unless another is specified below)
 
 Check `git diff --cached -U0 | grep '^+'` for added/changed comment lines. If there are none, skip this stage and say so.
 
-If there are: run the **cleanup-redundant-comments** workflow. Follows that template's rule of one subagent per changed file — spawn them in parallel across files (use balanced subagents), each scoped to a single file and to comments touched by this diff only.
+If there are: run the **cleanup-redundant-comments** workflow. Follow that template's rule of one subagent per changed file — spawn them in parallel across files (use balanced subagents), each scoped to a single file and to comments touched by this diff only.
 
 ## Stage 4 — Tests (only if tests were added/changed)
 
@@ -39,8 +39,8 @@ If the staged set contains test files (`*.test.*`, `*.spec.*`, `tests/**`), run 
 
 ## Stage 6 — Review the staged diff
 
-Run the **review-branch** workflow with a strong subagent, but **targeting the staged changes only**: the subagent reviews `git diff --cached` (not a merge-base range) and reviews only — no edits. Strictly scope the review to simplification, overly defensive programming, unnecessary abstractions, dead/redundant code. The subagent should output its finding into a review file. There's no need to prompt the subagent to check for correctness.
+Run the **review-branch** workflow with a strong subagent, but **targeting the staged changes only**: the subagent reviews `git diff --cached` (not a merge-base range) and reviews only — no edits. Strictly scope the review to simplification, overly defensive programming, unnecessary abstractions, dead/redundant code. The subagent should output its findings into a review file. There's no need to prompt the subagent to check for correctness.
 
-## Stage 7 - Apply review
+## Stage 7 — Apply review
 
 Then, instead of validating the findings yourself, spawn a strong subagent to validate and apply the review findings. Do NOT stage the final changes.
