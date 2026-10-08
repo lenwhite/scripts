@@ -16,11 +16,6 @@ config (no parsing of `pyproject.toml` for tool settings, no respect for
 project-level formatter settings beyond detection-based opt-in).
 Requirements here are shaped by personal/agentic workflows, which differ
 from repo-level CI configurations.
-
-Project-specific behavior is handled via in-script condition checks
-(e.g., mypy only runs when a project's `pyproject.toml` mentions it, and
-JS tools only run when the project has them installed), not by honoring
-project config files.
 """
 
 import os
@@ -58,7 +53,6 @@ JS_RUNNERS: dict[str, list[str]] = {
 
 
 def detect_js_runner() -> list[str]:
-    """Pick the JS binary runner from the nearest lockfile at or above the cwd."""
     cwd = Path.cwd()
     for directory in [cwd, *cwd.parents]:
         for lockfile, runner in JS_RUNNERS.items():
@@ -71,13 +65,10 @@ JS_RUNNER = detect_js_runner()
 
 
 def js_bin_installed(name: str) -> list[str]:
-    """Command that exits 0 when the project has the `name` binary installed."""
     return [*JS_RUNNER, name, "--version"]
 
 
 # File type definitions with commands ordered cheapest → most expensive.
-# Commands can have conditions: a command is skipped unless every "only_if"
-# command exits 0 and every "not_if" command exits non-zero.
 #
 # TODO: per the positioning in the module docstring, FILE_TYPES is currently
 # embedded as the single source of config. It may move to an external local
@@ -195,7 +186,6 @@ env.pop("VIRTUAL_ENV", None)
 
 @cache
 def condition_succeeds(cmd: tuple[str, ...]) -> bool:
-    """Run a condition command once. A missing executable counts as failure."""
     try:
         result = subprocess.run(cmd, capture_output=True, env=env, check=False)
     except FileNotFoundError:
@@ -204,9 +194,6 @@ def condition_succeeds(cmd: tuple[str, ...]) -> bool:
 
 
 def should_run(cmd_config: CommandConfig) -> bool:
-    """Return True if no "not_if" command succeeds and every "only_if" one does."""
-    # "not_if" goes first: its probes are usually already cached, so a hit
-    # skips the "only_if" probes entirely.
     return not any(
         condition_succeeds(tuple(cmd)) for cmd in cmd_config.get("not_if", [])
     ) and all(condition_succeeds(tuple(cmd)) for cmd in cmd_config.get("only_if", []))
@@ -258,7 +245,6 @@ def main(files: tuple[Path, ...]) -> None:
                 check=False,
             )
             if result.returncode != 0:
-                # e.g., "yarn run -T -B prettier --write"
                 click.echo(f"Error: {' '.join(cmd)} failed", err=True)
                 click.echo(truncate_output(result.stdout + result.stderr), err=True)
                 sys.exit(2)
