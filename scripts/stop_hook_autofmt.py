@@ -12,14 +12,14 @@ Positioning
 -----------
 This is a personal, local CLI tool - think `ripgrep`, not a repo-committed
 formatter. It is intentionally NOT coupled to any specific repo's tooling
-config (no reading of `pyproject.toml`, no respect for project-level
-formatter settings beyond detection-based opt-in). Requirements here are
-shaped by personal/agentic workflows, which differ from repo-level CI
-configurations.
+config (no parsing of `pyproject.toml` for tool settings, no respect for
+project-level formatter settings beyond detection-based opt-in).
+Requirements here are shaped by personal/agentic workflows, which differ
+from repo-level CI configurations.
 
 Project-specific behavior is handled via in-script prereq detection
 (e.g., mypy only runs when a project's `pyproject.toml` mentions it, and
-JS tools only run when the project has them installed), not by reading
+JS tools only run when the project has them installed), not by honoring
 project config files.
 """
 
@@ -100,13 +100,11 @@ FILE_TYPES: dict[str, FileTypeConfig] = {
                 "cmd": ["uv", "run", "--with", "ruff", "ruff", "check"],
                 "append_files": True,
             },
-            # {
-            #     "cmd": ["uv", "run", "--with", "ty", "ty", "check"],
-            #     "append_files": True,
-            #     "prereqs": [
-            #         {"cmd": ["rg", "-q", "mypy", "pyproject.toml"], "invert": True}
-            #     ],
-            # },
+            {
+                "cmd": ["uv", "run", "ty", "check"],
+                "append_files": True,
+                "prereqs": [{"cmd": ["rg", "-qw", "ty", "pyproject.toml"]}],
+            },
             {
                 "cmd": ["uv", "run", "mypy"],
                 "append_files": True,
@@ -187,8 +185,10 @@ def truncate_output(output: str) -> str:
     """Truncate output to MAX_OUTPUT_CHARS or MAX_OUTPUT_LINES, whichever is smaller."""
     lines = output.splitlines(keepends=True)
     if len(lines) > MAX_OUTPUT_LINES:
-        lines = lines[:MAX_OUTPUT_LINES]
-        output = "".join(lines) + f"\n... truncated ({len(lines)} lines shown)\n"
+        output = (
+            "".join(lines[:MAX_OUTPUT_LINES])
+            + f"\n... truncated ({MAX_OUTPUT_LINES} lines shown)\n"
+        )
     if len(output) > MAX_OUTPUT_CHARS:
         output = (
             output[:MAX_OUTPUT_CHARS]
@@ -219,26 +219,6 @@ def check_prereqs(prereqs: list[Prereq]) -> bool:
     )
 
 
-def run_command(
-    cmd: list[str], files: list[Path], append_files: bool
-) -> tuple[bool, str]:
-    """
-    Run a command, optionally appending files to it.
-
-    Returns (success, output) tuple.
-    Raises FileNotFoundError if the tool is not found.
-    """
-    full_cmd = cmd.copy()
-    if append_files:
-        full_cmd.extend(str(f) for f in files)
-
-    result = subprocess.run(
-        full_cmd, capture_output=True, text=True, env=env, check=False
-    )
-    output = result.stdout + result.stderr
-    return result.returncode == 0, output
-
-
 @click.command()
 @click.argument("files", nargs=-1, type=click.Path(exists=True, path_type=Path))
 def main(files: tuple[Path, ...]) -> None:
@@ -246,56 +226,51 @@ def main(files: tuple[Path, ...]) -> None:
 
     FILES can be provided as arguments or piped via stdin (one path per line).
     """
-    if not files:
-        stdin_paths = [
-            Path(line.strip()) for line in sys.stdin.read().splitlines() if line.strip()
+    paths = list(files)
+    if not paths:
+        paths = [
+            Path(stripped)
+            for line in sys.stdin.read().splitlines()
+            if (stripped := line.strip())
         ]
-        if not stdin_paths:
-            sys.exit(0)
-        for p in stdin_paths:
+        for p in paths:
             if not p.exists():
                 raise click.BadParameter(
                     f"Path '{p}' does not exist.", param_hint="files"
                 )
-        files = tuple(stdin_paths)
+    if not paths:
+        return
 
-    grouped = group_files_by_type(list(files))
+    grouped = group_files_by_type(paths)
 
     if not grouped:
         click.echo("No supported files found.")
-        sys.exit(0)
-
-    processed_types: list[str] = []
+        return
 
     for file_type, type_files in grouped.items():
-        config = FILE_TYPES[file_type]
-        processed_types.append(file_type)
-
         click.echo(
             f"Processing {file_type} files: {', '.join(str(f) for f in type_files)}"
         )
 
-        for cmd_config in config["commands"]:
-            cmd = cmd_config["cmd"]
-            append_files = cmd_config["append_files"]
-            cmd_name = " ".join(cmd)  # e.g., "yarn run -T -B prettier --write"
-
+        for cmd_config in FILE_TYPES[file_type]["commands"]:
             if not check_prereqs(cmd_config.get("prereqs", [])):
                 continue
 
-            try:
-                success, output = run_command(cmd, type_files, append_files)
-                if not success:
-                    click.echo(f"Error: {cmd_name} failed", err=True)
-                    click.echo(truncate_output(output), err=True)
-                    sys.exit(2)
-            except FileNotFoundError:
-                click.echo(
-                    f"Warning: {cmd[0]} not found, skipping {cmd_name}", err=True
-                )
-                continue
+            cmd = cmd_config["cmd"]
+            result = subprocess.run(
+                [*cmd, *type_files] if cmd_config["append_files"] else cmd,
+                capture_output=True,
+                text=True,
+                env=env,
+                check=False,
+            )
+            if result.returncode != 0:
+                # e.g., "yarn run -T -B prettier --write"
+                click.echo(f"Error: {' '.join(cmd)} failed", err=True)
+                click.echo(truncate_output(result.stdout + result.stderr), err=True)
+                sys.exit(2)
 
-    click.echo(f"Done. Processed: {', '.join(processed_types)}")
+    click.echo(f"Done. Processed: {', '.join(grouped)}")
 
 
 if __name__ == "__main__":
