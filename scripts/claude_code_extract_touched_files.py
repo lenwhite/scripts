@@ -5,7 +5,8 @@
 """
 Extract file paths from Claude Code conversation JSONL logs.
 
-Finds all Write/Edit operations and mv commands, outputs the file paths to stdout.
+Finds all Write/Edit operations and mv / git mv commands, outputs the file paths
+to stdout.
 """
 
 import json
@@ -17,22 +18,38 @@ from pathlib import Path
 import click
 
 
-def extract_mv_destination(command: str) -> str | None:
-    """Extract destination path from an mv command (best-effort)."""
+def split_commands(command: str) -> list[list[str]]:
+    """Split a shell command line on `&&`, `||`, `;` and `|` (best-effort)."""
+    lexer = shlex.shlex(command, posix=True, punctuation_chars=True)
+    lexer.whitespace_split = True
+    lexer.commenters = ""
+
+    commands: list[list[str]] = [[]]
     try:
-        parts = shlex.split(command)
+        for token in lexer:
+            if set(token) <= set("&|;"):
+                commands.append([])
+            else:
+                commands[-1].append(token)
     except ValueError:
-        return None
+        return []
+    return commands
 
-    if not parts or parts[0] != "mv":
-        return None
 
-    # Skip options (args starting with -)
-    args = [p for p in parts[1:] if not p.startswith("-")]
+def extract_mv_destination(command: str) -> str | None:
+    """Extract destination path from an mv or git mv command (best-effort)."""
+    for parts in split_commands(command):
+        if parts[:2] == ["git", "mv"]:
+            parts = parts[1:]
+        if not parts or parts[0] != "mv":
+            continue
 
-    # Simple case: mv src dest
-    if len(args) == 2:
-        return args[1]
+        # Skip options (args starting with -)
+        args = [p for p in parts[1:] if not p.startswith("-")]
+
+        # Simple case: mv src dest
+        if len(args) == 2:
+            return args[1]
 
     return None
 
