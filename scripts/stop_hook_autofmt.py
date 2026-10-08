@@ -18,26 +18,31 @@ shaped by personal/agentic workflows, which differ from repo-level CI
 configurations.
 
 Project-specific behavior is handled via in-script prereq detection
-(e.g., mypy only runs when a project's `pyproject.toml` mentions it),
-not by reading project config files.
+(e.g., mypy only runs when a project's `pyproject.toml` mentions it, and
+JS tools only run when the project has them installed), not by reading
+project config files.
 """
 
-import json
 import os
 import subprocess
 import sys
 from collections import defaultdict
+from functools import cache
 from pathlib import Path
 from typing import NotRequired, TypedDict
 
 import click
 
 
+class Prereq(TypedDict):
+    cmd: list[str]
+    invert: NotRequired[bool]
+
+
 class CommandConfig(TypedDict):
     cmd: list[str]
     append_files: bool
-    prereq: NotRequired[list[str]]
-    prereq_invert: NotRequired[bool]
+    prereqs: NotRequired[list[Prereq]]
 
 
 class FileTypeConfig(TypedDict):
@@ -45,60 +50,38 @@ class FileTypeConfig(TypedDict):
     commands: list[CommandConfig]
 
 
+# Runners that only resolve binaries the project already has installed, so a
+# missing tool fails its prereq instead of being fetched from the registry.
+JS_RUNNERS: dict[str, list[str]] = {
+    "bun.lockb": ["bunx", "--no-install"],
+    "bun.lock": ["bunx", "--no-install"],
+    "yarn.lock": ["yarn", "run", "-T", "-B"],
+    "pnpm-lock.yaml": ["pnpm", "exec"],
+    "package-lock.json": ["npx", "--no-install"],
+}
+
+
 def detect_js_runner() -> list[str]:
-    """Pick the JS package runner from lockfiles in the cwd."""
-    if Path("bun.lockb").exists() or Path("bun.lock").exists():
-        return ["bunx"]
-    if Path("yarn.lock").exists():
-        return ["yarn", "dlx"]
-    if Path("pnpm-lock.yaml").exists():
-        return ["pnpm", "dlx"]
-    return ["npx"]
+    """Pick the JS binary runner from the nearest lockfile at or above the cwd."""
+    cwd = Path.cwd()
+    for directory in [cwd, *cwd.parents]:
+        for lockfile, runner in JS_RUNNERS.items():
+            if (directory / lockfile).exists():
+                return runner
+    return ["npx", "--no-install"]
 
 
-def detect_biome() -> bool:
-    """Return True if biome is configured for this project."""
-    if Path("biome.json").exists() or Path("biome.jsonc").exists():
-        return True
-    pkg = Path("package.json")
-    if not pkg.exists():
-        return False
-    try:
-        data = json.loads(pkg.read_text())
-    except (json.JSONDecodeError, OSError):
-        return False
-    deps = {**data.get("dependencies", {}), **data.get("devDependencies", {})}
-    return "@biomejs/biome" in deps
+JS_RUNNER = detect_js_runner()
 
 
-def build_js_commands() -> list[CommandConfig]:
-    runner = detect_js_runner()
-    if detect_biome():
-        return [
-            {
-                "cmd": [
-                    *runner,
-                    "@biomejs/biome",
-                    "check",
-                    "--write",
-                    "--error-on-warnings",
-                ],
-                "append_files": True,
-            },
-            {"cmd": [*runner, "tsc", "--noEmit"], "append_files": False},
-        ]
-    return [
-        {"cmd": [*runner, "prettier", "--write"], "append_files": True},
-        {"cmd": [*runner, "tsc", "--noEmit"], "append_files": False},
-        {
-            "cmd": [*runner, "eslint", "--max-warnings", "0", "--no-warn-ignored"],
-            "append_files": True,
-        },
-    ]
+def js_bin_installed(name: str, *, invert: bool = False) -> Prereq:
+    """Prereq that passes when the project has the `name` binary installed."""
+    return {"cmd": [*JS_RUNNER, name, "--version"], "invert": invert}
 
 
 # File type definitions with commands ordered cheapest → most expensive.
-# Commands can have "prereq": if the prereq command fails, the command is skipped.
+# Commands can have "prereqs": a command is skipped unless every prereq command
+# exits 0 (or non-zero, for prereqs with "invert").
 #
 # TODO: per the positioning in the module docstring, FILE_TYPES is currently
 # embedded as the single source of config. It may move to an external local
@@ -120,24 +103,61 @@ FILE_TYPES: dict[str, FileTypeConfig] = {
             # {
             #     "cmd": ["uv", "run", "--with", "ty", "ty", "check"],
             #     "append_files": True,
-            #     "prereq": ["rg", "-q", "mypy", "pyproject.toml"],
-            #     "prereq_invert": True,
+            #     "prereqs": [
+            #         {"cmd": ["rg", "-q", "mypy", "pyproject.toml"], "invert": True}
+            #     ],
             # },
             {
                 "cmd": ["uv", "run", "mypy"],
                 "append_files": True,
-                "prereq": ["rg", "-q", "mypy", "pyproject.toml"],
+                "prereqs": [{"cmd": ["rg", "-q", "mypy", "pyproject.toml"]}],
             },
             {
                 "cmd": ["uv", "run", "pyright"],
                 "append_files": True,
-                "prereq": ["rg", "-q", "pyright", "pyproject.toml"],
+                "prereqs": [{"cmd": ["rg", "-q", "pyright", "pyproject.toml"]}],
             },
         ],
     },
     "typescript or javascript": {
         "extensions": [".js", ".ts", ".jsx", ".tsx"],
-        "commands": build_js_commands(),
+        "commands": [
+            {
+                "cmd": [*JS_RUNNER, "biome", "check", "--write", "--error-on-warnings"],
+                "append_files": True,
+                "prereqs": [js_bin_installed("biome")],
+            },
+            {
+                "cmd": [*JS_RUNNER, "prettier", "--write"],
+                "append_files": True,
+                "prereqs": [
+                    js_bin_installed("biome", invert=True),
+                    js_bin_installed("prettier"),
+                ],
+            },
+            {
+                "cmd": [*JS_RUNNER, "tsc", "--noEmit"],
+                "append_files": False,
+                "prereqs": [
+                    {"cmd": ["test", "-f", "tsconfig.json"]},
+                    js_bin_installed("tsc"),
+                ],
+            },
+            {
+                "cmd": [
+                    *JS_RUNNER,
+                    "eslint",
+                    "--max-warnings",
+                    "0",
+                    "--no-warn-ignored",
+                ],
+                "append_files": True,
+                "prereqs": [
+                    js_bin_installed("biome", invert=True),
+                    js_bin_installed("eslint"),
+                ],
+            },
+        ],
     },
 }
 
@@ -181,11 +201,22 @@ env = os.environ.copy()
 env.pop("VIRTUAL_ENV", None)
 
 
-def check_prereq(prereq: list[str], invert: bool = False) -> bool:
-    """Run a prerequisite command. Returns True if prereq passes (exit 0), or inverted if invert=True."""
-    result = subprocess.run(prereq, capture_output=True, env=env, check=False)
-    passed = result.returncode == 0
-    return not passed if invert else passed
+@cache
+def prereq_cmd_succeeds(cmd: tuple[str, ...]) -> bool:
+    """Run a prerequisite command once. A missing executable counts as failure."""
+    try:
+        result = subprocess.run(cmd, capture_output=True, env=env, check=False)
+    except FileNotFoundError:
+        return False
+    return result.returncode == 0
+
+
+def check_prereqs(prereqs: list[Prereq]) -> bool:
+    """Return True if every prereq passes (exit 0, or non-zero when inverted)."""
+    return all(
+        prereq_cmd_succeeds(tuple(prereq["cmd"])) != prereq.get("invert", False)
+        for prereq in prereqs
+    )
 
 
 def run_command(
@@ -247,11 +278,9 @@ def main(files: tuple[Path, ...]) -> None:
         for cmd_config in config["commands"]:
             cmd = cmd_config["cmd"]
             append_files = cmd_config["append_files"]
-            prereq = cmd_config.get("prereq")
-            prereq_invert = cmd_config.get("prereq_invert", False) or False
-            cmd_name = " ".join(cmd[:2])  # e.g., "uvx ruff" or "npx prettier"
+            cmd_name = " ".join(cmd)  # e.g., "yarn run -T -B prettier --write"
 
-            if prereq and not check_prereq(prereq, prereq_invert):
+            if not check_prereqs(cmd_config.get("prereqs", [])):
                 continue
 
             try:
