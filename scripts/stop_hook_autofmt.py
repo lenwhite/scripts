@@ -17,7 +17,7 @@ project-level formatter settings beyond detection-based opt-in).
 Requirements here are shaped by personal/agentic workflows, which differ
 from repo-level CI configurations.
 
-Project-specific behavior is handled via in-script prereq detection
+Project-specific behavior is handled via in-script condition checks
 (e.g., mypy only runs when a project's `pyproject.toml` mentions it, and
 JS tools only run when the project has them installed), not by honoring
 project config files.
@@ -34,15 +34,11 @@ from typing import NotRequired, TypedDict
 import click
 
 
-class Prereq(TypedDict):
-    cmd: list[str]
-    invert: NotRequired[bool]
-
-
 class CommandConfig(TypedDict):
     cmd: list[str]
     append_files: bool
-    prereqs: NotRequired[list[Prereq]]
+    only_if: NotRequired[list[list[str]]]
+    not_if: NotRequired[list[list[str]]]
 
 
 class FileTypeConfig(TypedDict):
@@ -51,7 +47,7 @@ class FileTypeConfig(TypedDict):
 
 
 # Runners that only resolve binaries the project already has installed, so a
-# missing tool fails its prereq instead of being fetched from the registry.
+# missing tool fails its `only_if` check instead of being fetched from the registry.
 JS_RUNNERS: dict[str, list[str]] = {
     "bun.lockb": ["bunx", "--no-install"],
     "bun.lock": ["bunx", "--no-install"],
@@ -74,14 +70,14 @@ def detect_js_runner() -> list[str]:
 JS_RUNNER = detect_js_runner()
 
 
-def js_bin_installed(name: str, *, invert: bool = False) -> Prereq:
-    """Prereq that passes when the project has the `name` binary installed."""
-    return {"cmd": [*JS_RUNNER, name, "--version"], "invert": invert}
+def js_bin_installed(name: str) -> list[str]:
+    """Command that exits 0 when the project has the `name` binary installed."""
+    return [*JS_RUNNER, name, "--version"]
 
 
 # File type definitions with commands ordered cheapest → most expensive.
-# Commands can have "prereqs": a command is skipped unless every prereq command
-# exits 0 (or non-zero, for prereqs with "invert").
+# Commands can have conditions: a command is skipped unless every "only_if"
+# command exits 0 and every "not_if" command exits non-zero.
 #
 # TODO: per the positioning in the module docstring, FILE_TYPES is currently
 # embedded as the single source of config. It may move to an external local
@@ -103,17 +99,17 @@ FILE_TYPES: dict[str, FileTypeConfig] = {
             {
                 "cmd": ["uv", "run", "ty", "check"],
                 "append_files": True,
-                "prereqs": [{"cmd": ["rg", "-qw", "ty", "pyproject.toml"]}],
+                "only_if": [["rg", "-qw", "ty", "pyproject.toml"]],
             },
             {
                 "cmd": ["uv", "run", "mypy"],
                 "append_files": True,
-                "prereqs": [{"cmd": ["rg", "-q", "mypy", "pyproject.toml"]}],
+                "only_if": [["rg", "-q", "mypy", "pyproject.toml"]],
             },
             {
                 "cmd": ["uv", "run", "pyright"],
                 "append_files": True,
-                "prereqs": [{"cmd": ["rg", "-q", "pyright", "pyproject.toml"]}],
+                "only_if": [["rg", "-q", "pyright", "pyproject.toml"]],
             },
         ],
     },
@@ -123,21 +119,19 @@ FILE_TYPES: dict[str, FileTypeConfig] = {
             {
                 "cmd": [*JS_RUNNER, "biome", "check", "--write", "--error-on-warnings"],
                 "append_files": True,
-                "prereqs": [js_bin_installed("biome")],
+                "only_if": [js_bin_installed("biome")],
             },
             {
                 "cmd": [*JS_RUNNER, "prettier", "--write"],
                 "append_files": True,
-                "prereqs": [
-                    js_bin_installed("biome", invert=True),
-                    js_bin_installed("prettier"),
-                ],
+                "only_if": [js_bin_installed("prettier")],
+                "not_if": [js_bin_installed("biome")],
             },
             {
                 "cmd": [*JS_RUNNER, "tsc", "--noEmit"],
                 "append_files": False,
-                "prereqs": [
-                    {"cmd": ["test", "-f", "tsconfig.json"]},
+                "only_if": [
+                    ["test", "-f", "tsconfig.json"],
                     js_bin_installed("tsc"),
                 ],
             },
@@ -150,10 +144,8 @@ FILE_TYPES: dict[str, FileTypeConfig] = {
                     "--no-warn-ignored",
                 ],
                 "append_files": True,
-                "prereqs": [
-                    js_bin_installed("biome", invert=True),
-                    js_bin_installed("eslint"),
-                ],
+                "only_if": [js_bin_installed("eslint")],
+                "not_if": [js_bin_installed("biome")],
             },
         ],
     },
@@ -202,8 +194,8 @@ env.pop("VIRTUAL_ENV", None)
 
 
 @cache
-def prereq_cmd_succeeds(cmd: tuple[str, ...]) -> bool:
-    """Run a prerequisite command once. A missing executable counts as failure."""
+def condition_succeeds(cmd: tuple[str, ...]) -> bool:
+    """Run a condition command once. A missing executable counts as failure."""
     try:
         result = subprocess.run(cmd, capture_output=True, env=env, check=False)
     except FileNotFoundError:
@@ -211,12 +203,13 @@ def prereq_cmd_succeeds(cmd: tuple[str, ...]) -> bool:
     return result.returncode == 0
 
 
-def check_prereqs(prereqs: list[Prereq]) -> bool:
-    """Return True if every prereq passes (exit 0, or non-zero when inverted)."""
-    return all(
-        prereq_cmd_succeeds(tuple(prereq["cmd"])) != prereq.get("invert", False)
-        for prereq in prereqs
-    )
+def should_run(cmd_config: CommandConfig) -> bool:
+    """Return True if no "not_if" command succeeds and every "only_if" one does."""
+    # "not_if" goes first: its probes are usually already cached, so a hit
+    # skips the "only_if" probes entirely.
+    return not any(
+        condition_succeeds(tuple(cmd)) for cmd in cmd_config.get("not_if", [])
+    ) and all(condition_succeeds(tuple(cmd)) for cmd in cmd_config.get("only_if", []))
 
 
 @click.command()
@@ -253,7 +246,7 @@ def main(files: tuple[Path, ...]) -> None:
         )
 
         for cmd_config in FILE_TYPES[file_type]["commands"]:
-            if not check_prereqs(cmd_config.get("prereqs", [])):
+            if not should_run(cmd_config):
                 continue
 
             cmd = cmd_config["cmd"]
