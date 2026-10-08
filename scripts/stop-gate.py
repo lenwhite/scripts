@@ -21,7 +21,6 @@ from repo-level CI configurations.
 import os
 import subprocess
 import sys
-from collections import defaultdict
 from functools import cache
 from pathlib import Path
 from typing import NotRequired, TypedDict
@@ -140,23 +139,33 @@ FILE_TYPES: dict[str, FileTypeConfig] = {
             },
         ],
     },
+    # Must stay last: types run in declaration order.
+    "all": {
+        "extensions": ["*"],
+        "commands": [
+            {
+                "cmd": [
+                    sys.executable,
+                    str(Path(__file__).parent / "comment-sweep-reminder.py"),
+                ],
+                "append_files": True,
+            },
+        ],
+    },
 }
 
 
-def get_file_type(path: Path) -> str | None:
-    suffix = path.suffix.lower()
-    for type_key, config in FILE_TYPES.items():
-        if suffix in config["extensions"]:
-            return type_key
-    return None
-
-
 def group_files_by_type(files: list[Path]) -> dict[str, list[Path]]:
-    grouped: dict[str, list[Path]] = defaultdict(list)
-    for file in files:
-        file_type = get_file_type(file)
-        if file_type:
-            grouped[file_type].append(file)
+    grouped: dict[str, list[Path]] = {}
+    for file_type, config in FILE_TYPES.items():
+        extensions = config["extensions"]
+        type_files = [
+            file
+            for file in files
+            if "*" in extensions or file.suffix.lower() in extensions
+        ]
+        if type_files:
+            grouped[file_type] = type_files
     return grouped
 
 
@@ -222,10 +231,6 @@ def main(files: tuple[Path, ...]) -> None:
         return
 
     grouped = group_files_by_type(paths)
-
-    if not grouped:
-        click.echo("No supported files found.")
-        return
 
     for file_type, type_files in grouped.items():
         click.echo(
