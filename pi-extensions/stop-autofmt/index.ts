@@ -7,7 +7,7 @@
  *     "Stop": [{ "hooks": [{ "type": "command", "command":
  *       "jq -r '.transcript_path'
  *          | uv run --script .../claude_code_extract_touched_files.py
- *          | uv run --script .../stop_hook_autofmt.py" }] }]
+ *          | uv run --script .../stop-gate.py" }] }]
  *   }
  *
  * The chain does three things when the agent stops:
